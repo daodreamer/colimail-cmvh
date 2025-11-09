@@ -1,0 +1,68 @@
+{
+  "name": "colimail-cmvh",
+  "version": "1.0.0",
+  "description": "ColiMail Verification Header - Blockchain-based email authentication SDK",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "blockchain",
+    "email",
+    "authentication",
+    "verification",
+    "cmvh",
+    "colimail",
+    "crypto",
+    "signature",
+    "web3"
+  ],
+  "author": "ColiMail Labs (Dao Dreamer)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daodreamer/colimail-cmvh.git",
+    "directory": "sdk/cmvh-js"
+  },
+  "bugs": {
+    "url": "https://github.com/daodreamer/colimail-cmvh/issues"
+  },
+  "homepage": "https://github.com/daodreamer/colimail-cmvh#readme",
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "@noble/secp256k1": "^3.0.0",
+    "viem": "^2.38"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@typescript-eslint/eslint-plugin": "^8.46",
+    "@typescript-eslint/parser": "^8.46",
+    "eslint": "^9.39",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9",
+    "vitest": "^4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
