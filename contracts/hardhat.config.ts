@@ -7,14 +7,21 @@ export default defineConfig({
     profiles: {
       default: {
         version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
       },
       production: {
         version: "0.8.28",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 1000,
           },
+          viaIR: true,
         },
       },
     },
@@ -34,5 +41,21 @@ export default defineConfig({
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
+    arbitrumSepolia: {
+      type: "http",
+      chainType: "generic",
+      url: "https://sepolia-rollup.arbitrum.io/rpc",
+      accounts: [],
+    },
+    arbitrum: {
+      type: "http",
+      chainType: "generic",
+      url: "https://arb1.arbitrum.io/rpc",
+      accounts: [],
+    },
+  },
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
   },
 });
