@@ -227,8 +227,8 @@ interface VerificationResult {
 - [x] TypeScript type definitions
 - [x] Error classes
 - [x] Unit tests (sign, verify, parse)
-- [ ] Integration tests (full email flow)
-- [ ] Performance benchmarks
+- [x] Integration tests (full email flow) - **19 comprehensive tests**
+- [x] Performance benchmarks - **11 benchmark suites with auto-generated report**
 
 ---
 

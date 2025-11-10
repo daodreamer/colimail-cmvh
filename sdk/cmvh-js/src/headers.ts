@@ -89,10 +89,10 @@ export function validateCMVHHeaders(headers: ParsedCMVHHeaders): void {
 
 /**
  * Format CMVH headers as email header lines
- * 
- * @param headers - Parsed CMVH headers
+ *
+ * @param headers - Parsed CMVH headers or CMVHHeaders
  * @returns Multiline string ready to inject into email
- * 
+ *
  * @example
  * ```ts
  * const formatted = formatCMVHHeaders(headers);
@@ -102,18 +102,39 @@ export function validateCMVHHeaders(headers: ParsedCMVHHeaders): void {
  * // ...
  * ```
  */
-export function formatCMVHHeaders(headers: ParsedCMVHHeaders): string {
+export function formatCMVHHeaders(headers: ParsedCMVHHeaders | CMVHHeaders): string {
+  // Convert CMVHHeaders format to ParsedCMVHHeaders format if needed
+  let parsed: ParsedCMVHHeaders;
+
+  if ("X-CMVH-Version" in headers) {
+    // CMVHHeaders format
+    const cmvhHeaders = headers as CMVHHeaders;
+    parsed = {
+      version: cmvhHeaders["X-CMVH-Version"],
+      address: cmvhHeaders["X-CMVH-Address"],
+      chain: cmvhHeaders["X-CMVH-Chain"],
+      timestamp: cmvhHeaders["X-CMVH-Timestamp"],
+      hashAlgo: cmvhHeaders["X-CMVH-HashAlgo"],
+      signature: cmvhHeaders["X-CMVH-Signature"],
+      ens: cmvhHeaders["X-CMVH-ENS"],
+      reward: cmvhHeaders["X-CMVH-Reward"],
+      proofURL: cmvhHeaders["X-CMVH-ProofURL"],
+    };
+  } else {
+    // Already ParsedCMVHHeaders format
+    parsed = headers as ParsedCMVHHeaders;
+  }
   const lines: string[] = [];
-  
-  if (headers.version) lines.push(`X-CMVH-Version: ${headers.version}`);
-  if (headers.address) lines.push(`X-CMVH-Address: ${headers.address}`);
-  if (headers.chain) lines.push(`X-CMVH-Chain: ${headers.chain}`);
-  if (headers.timestamp) lines.push(`X-CMVH-Timestamp: ${headers.timestamp}`);
-  if (headers.hashAlgo) lines.push(`X-CMVH-HashAlgo: ${headers.hashAlgo}`);
-  if (headers.signature) lines.push(`X-CMVH-Signature: ${headers.signature}`);
-  if (headers.ens) lines.push(`X-CMVH-ENS: ${headers.ens}`);
-  if (headers.reward) lines.push(`X-CMVH-Reward: ${headers.reward}`);
-  if (headers.proofURL) lines.push(`X-CMVH-ProofURL: ${headers.proofURL}`);
-  
+
+  if (parsed.version) lines.push(`X-CMVH-Version: ${parsed.version}`);
+  if (parsed.address) lines.push(`X-CMVH-Address: ${parsed.address}`);
+  if (parsed.chain) lines.push(`X-CMVH-Chain: ${parsed.chain}`);
+  if (parsed.timestamp) lines.push(`X-CMVH-Timestamp: ${parsed.timestamp}`);
+  if (parsed.hashAlgo) lines.push(`X-CMVH-HashAlgo: ${parsed.hashAlgo}`);
+  if (parsed.signature) lines.push(`X-CMVH-Signature: ${parsed.signature}`);
+  if (parsed.ens) lines.push(`X-CMVH-ENS: ${parsed.ens}`);
+  if (parsed.reward) lines.push(`X-CMVH-Reward: ${parsed.reward}`);
+  if (parsed.proofURL) lines.push(`X-CMVH-ProofURL: ${parsed.proofURL}`);
+
   return lines.join("\n");
 }

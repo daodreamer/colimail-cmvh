@@ -99,11 +99,13 @@ function validateSignInput(input: SignEmailInput): void {
   if (!input.to) {
     throw new CMVHValidationError("Missing 'to' field");
   }
-  
-  if (!input.subject) {
+
+  // Subject can be empty string, but must be defined
+  if (input.subject === undefined || input.subject === null) {
     throw new CMVHValidationError("Missing 'subject' field");
   }
-  
+
+  // Body can be empty string, but must be defined
   if (input.body === undefined || input.body === null) {
     throw new CMVHValidationError("Missing 'body' field");
   }

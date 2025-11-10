@@ -34,7 +34,7 @@ export function canonicalizeEmail(content: EmailContent): string {
 
 /**
  * Validate email content before canonicalization
- * 
+ *
  * @param content - Email content to validate
  * @throws {Error} If any required field is missing
  */
@@ -45,9 +45,11 @@ export function validateEmailContent(content: EmailContent): void {
   if (!content.to) {
     throw new Error("Missing required field: to");
   }
-  if (!content.subject) {
+  // Subject can be empty string, but must be defined
+  if (content.subject === undefined || content.subject === null) {
     throw new Error("Missing required field: subject");
   }
+  // Body can be empty string, but must be defined
   if (content.body === undefined || content.body === null) {
     throw new Error("Missing required field: body");
   }
