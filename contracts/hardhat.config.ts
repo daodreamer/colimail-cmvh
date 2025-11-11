@@ -1,8 +1,9 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 export default defineConfig({
-  plugins: [hardhatToolboxViemPlugin],
+  plugins: [hardhatVerify, hardhatToolboxViemPlugin],
   solidity: {
     profiles: {
       default: {
@@ -45,17 +46,35 @@ export default defineConfig({
       type: "http",
       chainType: "generic",
       url: "https://sepolia-rollup.arbitrum.io/rpc",
-      accounts: [],
+      accounts: [configVariable("ARBITRUM_SEPOLIA_PRIVATE_KEY")],
     },
     arbitrum: {
       type: "http",
       chainType: "generic",
       url: "https://arb1.arbitrum.io/rpc",
-      accounts: [],
+      accounts: [configVariable("ARBITRUM_PRIVATE_KEY")],
     },
   },
   gasReporter: {
     enabled: true,
     currency: "USD",
   },
+  verify: {
+    etherscan: {
+      apiKey: "YOUR_ETHERSCAN_API_KEY",
+    },
+  },
+  chainDescriptors: {
+        // Arbitrum Sepolia
+        421614: {
+          name: "Arbitrum Sepolia",
+          blockExplorers: {
+            etherscan: {
+              name: "Arbiscan Sepolia",
+              url: "https://sepolia.arbiscan.io",
+              apiUrl: "https://api-sepolia.arbiscan.io/api",
+            },
+          },
+        },
+    }
 });
