@@ -33,12 +33,11 @@ describe("CMVHVerifier", async function () {
     subject: "Test Email",
     from: "alice@example.com",
     to: "bob@example.com",
-    body: "Hello world"
   };
 
-  // Canonicalize email (matching SDK algorithm: subject\nfrom\nto\nbody)
+  // Canonicalize email (matching SDK algorithm: subject\nfrom\nto - body excluded)
   function canonicalizeEmail(email: typeof testEmail): string {
-    return `${email.subject}\n${email.from}\n${email.to}\n${email.body}`;
+    return `${email.subject}\n${email.from}\n${email.to}`;
   }
 
   // Hash email content
@@ -114,8 +113,8 @@ describe("CMVHVerifier", async function () {
     });
 
     it("Should reject signature for tampered content", async function () {
-      // Create different email content
-      const tamperedEmail = { ...testEmail, body: "Tampered content" };
+      // Create different email content (change subject)
+      const tamperedEmail = { ...testEmail, subject: "Tampered Subject" };
       const tamperedHash = hashEmail(tamperedEmail);
 
       const isValid = await verifier.read.verifySignature([
@@ -135,7 +134,6 @@ describe("CMVHVerifier", async function () {
         testEmail.subject,
         testEmail.from,
         testEmail.to,
-        testEmail.body,
         signature
       ]);
 
@@ -148,7 +146,6 @@ describe("CMVHVerifier", async function () {
         "Tampered Subject",
         testEmail.from,
         testEmail.to,
-        testEmail.body,
         signature
       ]);
 
@@ -161,7 +158,6 @@ describe("CMVHVerifier", async function () {
         testEmail.subject,
         "eve@malicious.com",
         testEmail.to,
-        testEmail.body,
         signature
       ]);
 
@@ -178,7 +174,6 @@ describe("CMVHVerifier", async function () {
         "",
         testEmail.from,
         testEmail.to,
-        testEmail.body,
         sig
       ]);
 
@@ -190,7 +185,6 @@ describe("CMVHVerifier", async function () {
         subject: "测试邮件 🎉",
         from: "用户@example.com",
         to: "接收者@example.com",
-        body: "你好世界! Hello 🌍"
       };
 
       const hash = hashEmail(unicodeEmail);
@@ -201,7 +195,6 @@ describe("CMVHVerifier", async function () {
         unicodeEmail.subject,
         unicodeEmail.from,
         unicodeEmail.to,
-        unicodeEmail.body,
         sig
       ]);
 
@@ -236,21 +229,20 @@ describe("CMVHVerifier", async function () {
           testEmail.subject,
           testEmail.from,
           testEmail.to,
-          testEmail.body,
           signature
         ]
       });
 
-      assert.ok(gasEstimate < 150000n, `Gas estimate (${gasEstimate}) should be < 150k`);
+      assert.ok(gasEstimate < 100000n, `Gas estimate (${gasEstimate}) should be < 100k`);
 
       console.log(`  ⛽ Gas estimate for verifyEmail: ${gasEstimate}`);
     });
   });
 
   describe("Edge Cases", function () {
-    it("Should handle very long email body", async function () {
-      const longBody = "A".repeat(10000);
-      const longEmail = { ...testEmail, body: longBody };
+    it("Should handle very long subject", async function () {
+      const longSubject = "A".repeat(1000);
+      const longEmail = { ...testEmail, subject: longSubject };
       const hash = hashEmail(longEmail);
       const sig = await testAccount.sign({ hash });
 
@@ -259,11 +251,10 @@ describe("CMVHVerifier", async function () {
         longEmail.subject,
         longEmail.from,
         longEmail.to,
-        longEmail.body,
         sig
       ]);
 
-      assert.equal(result, true, "Long email body should be verified");
+      assert.equal(result, true, "Long subject should be verified");
     });
 
     it("Should handle special characters in email fields", async function () {
@@ -271,7 +262,6 @@ describe("CMVHVerifier", async function () {
         subject: "Re: [URGENT] <Test> & 'Quote'",
         from: "user+tag@sub.example.com",
         to: "recipient@example.co.uk",
-        body: 'Body with "quotes", <tags>, and & symbols\n\nMultiple\nLines'
       };
 
       const hash = hashEmail(specialEmail);
@@ -282,7 +272,6 @@ describe("CMVHVerifier", async function () {
         specialEmail.subject,
         specialEmail.from,
         specialEmail.to,
-        specialEmail.body,
         sig
       ]);
 
@@ -308,8 +297,7 @@ describe("CMVHVerifier", async function () {
       const computed = await verifier.read.hashEmail([
         testEmail.subject,
         testEmail.from,
-        testEmail.to,
-        testEmail.body
+        testEmail.to
       ]);
 
       assert.equal(computed, emailHash, "Contract should compute same hash as SDK");

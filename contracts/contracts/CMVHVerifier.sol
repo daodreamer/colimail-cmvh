@@ -17,7 +17,8 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
  * - EIP-191 compliant signature recovery
  *
  * Canonicalization Algorithm (matching SDK):
- * canonical = subject + "\n" + from + "\n" + to + "\n" + body
+ * canonical = subject + "\n" + from + "\n" + to
+ * Note: Body is excluded to avoid HTML formatting issues
  *
  * Security Notes:
  * - MVP: No replay protection (Phase 3+)
@@ -55,7 +56,7 @@ contract CMVHVerifier {
         address signer,
         bytes32 emailHash,
         bytes memory signature
-    ) public view returns (bool isValid) {
+    ) public pure returns (bool isValid) {
         // Recover signer address from signature
         address recovered = recoverSigner(emailHash, signature);
 
@@ -71,22 +72,20 @@ contract CMVHVerifier {
      * @param subject Email subject line
      * @param from Email from address
      * @param to Email to address
-     * @param body Email body content
      * @param signature ECDSA signature
      * @return isValid True if email signature is valid
      *
-     * Gas: ~50k-70k for typical email, <150k for very long content
+     * Gas: ~45k-60k for typical email
      */
     function verifyEmail(
         address signer,
         string calldata subject,
         string calldata from,
         string calldata to,
-        string calldata body,
         bytes memory signature
-    ) public view returns (bool isValid) {
+    ) public pure returns (bool isValid) {
         // Compute email hash using same canonicalization as SDK
-        bytes32 emailHash = hashEmail(subject, from, to, body);
+        bytes32 emailHash = hashEmail(subject, from, to);
 
         // Verify signature
         return verifySignature(signer, emailHash, signature);
@@ -119,38 +118,35 @@ contract CMVHVerifier {
 
     /**
      * @notice Hash email content using CMVH canonicalization
-     * @dev Matches SDK canonicalization: subject\nfrom\nto\nbody
+     * @dev Matches SDK canonicalization: subject\nfrom\nto
+     *      Body excluded to avoid HTML formatting issues
      *
      * Canonicalization Rules:
      * 1. Concatenate fields with single newline separator
-     * 2. Order: subject, from, to, body
+     * 2. Order: subject, from, to
      * 3. No trimming or normalization
      * 4. UTF-8 encoding assumed
      *
      * @param subject Email subject (can be empty)
      * @param from Email from address
      * @param to Email to address
-     * @param body Email body (can be empty)
      * @return hash keccak256 hash of canonicalized email
      *
-     * Gas: ~10k-30k depending on content length
+     * Gas: ~8k-15k depending on content length
      */
     function hashEmail(
         string calldata subject,
         string calldata from,
-        string calldata to,
-        string calldata body
+        string calldata to
     ) public pure returns (bytes32 hash) {
-        // Canonicalize: subject\nfrom\nto\nbody
+        // Canonicalize: subject\nfrom\nto
         // Using abi.encodePacked for efficient string concatenation
         bytes memory canonical = abi.encodePacked(
             subject,
             "\n",
             from,
             "\n",
-            to,
-            "\n",
-            body
+            to
         );
 
         // Hash canonicalized content
@@ -172,7 +168,7 @@ contract CMVHVerifier {
         address[] calldata signers,
         bytes32[] calldata emailHashes,
         bytes[] calldata signatures
-    ) external view returns (bool[] memory results) {
+    ) external pure returns (bool[] memory results) {
         require(
             signers.length == emailHashes.length &&
             emailHashes.length == signatures.length,

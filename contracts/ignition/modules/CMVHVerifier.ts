@@ -10,7 +10,7 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
  * - Testnet: npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts --network arbitrumSepolia
  * - Mainnet: npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts --network arbitrum
  */
-export default buildModule("CMVHVerifierModule", (m) => {
+export default buildModule("CMVHVerifierModule_V3", (m) => {
   // Deploy CMVHVerifier contract
   const verifier = m.contract("CMVHVerifier", [], {
     // No constructor arguments needed
