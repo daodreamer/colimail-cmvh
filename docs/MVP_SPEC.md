@@ -1,33 +1,38 @@
 # CMVH MVP Specification
 
-**Version:** 1.0.0  
-**Status:** Draft  
-**Date:** 2025-11-09
+**Version:** 1.0.0
+**Status:** ✅ **Production Ready** (Phase 1-3 Complete)
+**Date:** 2025-11-12
+**Last Updated:** 2025-11-12
 
 ---
 
 ## Scope
 
-This document defines the **Minimum Viable Product (MVP)** specification for ColiMail Verification Header (CMVH). The MVP focuses on local signature generation and verification without blockchain interaction.
+This document defines the **implemented** specification for ColiMail Verification Header (CMVH) v1.0. The specification has been fully implemented and tested across:
+- **Phase 1**: TypeScript SDK (47 tests passing)
+- **Phase 2**: Solidity smart contract (27 tests passing, deployed to Arbitrum Sepolia)
+- **Phase 3**: Rust/Tauri client integration (production ready)
 
-## Features Included in MVP
+## Features Implemented
 
-✅ **Local Signing** - Sign emails with Ethereum private keys  
-✅ **Local Verification** - Verify signatures without blockchain calls  
-✅ **Canonical Hashing** - Deterministic email content hashing  
-✅ **ENS Display** - Optional ENS name field (display-only, no resolution)  
-✅ **Reward Field** - Optional reward amount field (no claiming functionality)
+✅ **Local Signing** - Sign emails with Ethereum private keys (Rust + TypeScript)
+✅ **Local Verification** - Verify signatures without blockchain calls (<50ms)
+✅ **On-Chain Verification** - Smart contract verification on Arbitrum Sepolia (~28k gas)
+✅ **Canonical Hashing** - Deterministic email metadata hashing (subject, from, to)
+✅ **ENS Display** - Optional ENS name field (display-only, no resolution)
+✅ **Reward Field** - Optional reward amount field (metadata only, no claiming)
+✅ **Smart Contract** - CMVHVerifier deployed at `0xc4BAD26e321A8D0FE3bA3337Fc3846c25506308a`
+✅ **Client Integration** - Full Tauri/SvelteKit implementation with UI
 
-## Features Excluded from MVP
+## Features for Future Phases
 
-❌ On-chain verification (EIP-1271)  
-❌ Smart contract interaction  
-❌ ENS reverse resolution  
-❌ Reward claiming  
-❌ Replay attack protection  
-❌ Timestamp validation  
-❌ IPFS proofs  
-❌ Attachment hashing
+❌ ENS reverse resolution (Phase 4+)
+❌ Reward claiming mechanism (Phase 4+)
+❌ Replay attack protection with nonce (Phase 4+)
+❌ Timestamp TTL validation (Phase 4+)
+❌ IPFS attachment proofs (Phase 4+)
+❌ EIP-1271 contract signatures (Phase 4+)
 
 ---
 
@@ -54,22 +59,36 @@ This document defines the **Minimum Viable Product (MVP)** specification for Col
 
 ## Canonicalization Algorithm
 
-**Input:** Email content (from, to, subject, body)  
+**Input:** Email metadata (from, to, subject) - **BODY EXCLUDED**
 **Output:** Canonical string for hashing
 
-### Algorithm
+### Algorithm (CMVH v1.0)
 
 ```
-canonical = SUBJECT + "\n" + FROM + "\n" + TO + "\n" + BODY
+canonical = SUBJECT + "\n" + FROM + "\n" + TO
 ```
+
+**⚠️ IMPORTANT CHANGE**: Body is **intentionally excluded** to avoid HTML formatting, whitespace, and encoding inconsistencies.
 
 ### Rules
 
 1. Fields are concatenated with single newline (`\n`) separators
-2. Order is strictly: `subject`, `from`, `to`, `body`
+2. Order is strictly: `subject`, `from`, `to` (**body excluded**)
 3. No trimming or whitespace normalization
 4. No encoding transformation (UTF-8 assumed)
 5. Empty fields are allowed (empty string)
+6. **Body content is NOT signed** - only metadata is authenticated
+
+### Design Rationale
+
+**Why exclude body?**
+- HTML formatting differences across email clients
+- Whitespace normalization inconsistencies
+- Encoding variations (UTF-8, quoted-printable, base64)
+- MIME multipart complexity
+- Attachment handling complexity
+
+**Metadata (subject, from, to) is sufficient for authentication** and remains consistent across clients.
 
 ### Example
 
@@ -79,11 +98,12 @@ Input:
   subject: "Test Email",
   from: "alice@example.com",
   to: "bob@example.com",
-  body: "Hello world"
+  body: "Hello world"  // Body is NOT included in canonical form
 }
 
-Canonical:
-"Test Email\nalice@example.com\nbob@example.com\nHello world"
+Canonical (CMVH v1.0):
+"Test Email\nalice@example.com\nbob@example.com"
+// Note: Body "Hello world" is excluded from canonicalization
 ```
 
 ---

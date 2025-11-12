@@ -1,6 +1,6 @@
 # CMVH Performance Benchmark Report
 
-Generated: 2025-11-10T18:06:56.155Z
+Generated: 2025-11-12T14:40:46.140Z
 Node.js: v24.4.1
 Platform: win32 x64
 
@@ -10,15 +10,15 @@ Platform: win32 x64
 
 | Operation | Avg Time (ms) | Min Time (ms) | Max Time (ms) | Ops/sec |
 |-----------|---------------|---------------|---------------|---------|
-| Email Signing (small) | 2.572 | 2.178 | 4.755 | 388.85 |
-| Email Signing (medium) | 2.483 | 2.196 | 2.909 | 402.81 |
-| Email Signing (large) | 5.671 | 5.362 | 6.126 | 176.34 |
-| Email Verification (small) | 1.289 | 1.153 | 1.954 | 775.74 |
-| Email Verification (medium) | 1.460 | 1.333 | 1.769 | 684.77 |
-| Email Verification (large) | 4.645 | 4.385 | 5.227 | 215.27 |
-| Email Canonicalization | 0.000 | 0.000 | 0.023 | 4520795.66 |
-| Bulk Signing (100 emails) | 186.254 | 184.914 | 187.608 | 5.37 |
-| Bulk Verification (100 emails) | 106.142 | 105.024 | 107.101 | 9.42 |
+| Email Signing (small) | 2.509 | 2.098 | 4.935 | 398.60 |
+| Email Signing (medium) | 2.269 | 1.999 | 2.707 | 440.66 |
+| Email Signing (large) | 2.284 | 2.026 | 2.681 | 437.87 |
+| Email Verification (small) | 1.313 | 1.191 | 1.750 | 761.78 |
+| Email Verification (medium) | 1.334 | 1.170 | 1.534 | 749.51 |
+| Email Verification (large) | 1.273 | 1.150 | 1.553 | 785.49 |
+| Email Canonicalization | 0.000 | 0.000 | 0.011 | 5408328.83 |
+| Bulk Signing (100 emails) | 188.045 | 180.413 | 199.499 | 5.32 |
+| Bulk Verification (100 emails) | 105.272 | 104.606 | 106.229 | 9.50 |
 | Memory Usage (1000 emails) | 0.000 | 0.000 | 0.000 | 0.00 |
 
 ---
@@ -28,11 +28,11 @@ Platform: win32 x64
 ### Email Signing (small)
 
 - **Iterations**: 100
-- **Total Time**: 257.17 ms
-- **Average Time**: 2.572 ms
-- **Min Time**: 2.178 ms
-- **Max Time**: 4.755 ms
-- **Operations per Second**: 388.85
+- **Total Time**: 250.88 ms
+- **Average Time**: 2.509 ms
+- **Min Time**: 2.098 ms
+- **Max Time**: 4.935 ms
+- **Operations per Second**: 398.60
 
 **Details:**
 - emailSize: 114 bytes
@@ -41,11 +41,11 @@ Platform: win32 x64
 ### Email Signing (medium)
 
 - **Iterations**: 50
-- **Total Time**: 124.13 ms
-- **Average Time**: 2.483 ms
-- **Min Time**: 2.196 ms
-- **Max Time**: 2.909 ms
-- **Operations per Second**: 402.81
+- **Total Time**: 113.47 ms
+- **Average Time**: 2.269 ms
+- **Min Time**: 1.999 ms
+- **Max Time**: 2.707 ms
+- **Operations per Second**: 440.66
 
 **Details:**
 - emailSize: 2997 bytes
@@ -54,11 +54,11 @@ Platform: win32 x64
 ### Email Signing (large)
 
 - **Iterations**: 20
-- **Total Time**: 113.42 ms
-- **Average Time**: 5.671 ms
-- **Min Time**: 5.362 ms
-- **Max Time**: 6.126 ms
-- **Operations per Second**: 176.34
+- **Total Time**: 45.68 ms
+- **Average Time**: 2.284 ms
+- **Min Time**: 2.026 ms
+- **Max Time**: 2.681 ms
+- **Operations per Second**: 437.87
 
 **Details:**
 - emailSize: 112096 bytes
@@ -67,11 +67,11 @@ Platform: win32 x64
 ### Email Verification (small)
 
 - **Iterations**: 100
-- **Total Time**: 128.91 ms
-- **Average Time**: 1.289 ms
-- **Min Time**: 1.153 ms
-- **Max Time**: 1.954 ms
-- **Operations per Second**: 775.74
+- **Total Time**: 131.27 ms
+- **Average Time**: 1.313 ms
+- **Min Time**: 1.191 ms
+- **Max Time**: 1.750 ms
+- **Operations per Second**: 761.78
 
 **Details:**
 - emailSize: 114 bytes
@@ -80,11 +80,11 @@ Platform: win32 x64
 ### Email Verification (medium)
 
 - **Iterations**: 50
-- **Total Time**: 73.02 ms
-- **Average Time**: 1.460 ms
-- **Min Time**: 1.333 ms
-- **Max Time**: 1.769 ms
-- **Operations per Second**: 684.77
+- **Total Time**: 66.71 ms
+- **Average Time**: 1.334 ms
+- **Min Time**: 1.170 ms
+- **Max Time**: 1.534 ms
+- **Operations per Second**: 749.51
 
 **Details:**
 - emailSize: 2997 bytes
@@ -93,11 +93,11 @@ Platform: win32 x64
 ### Email Verification (large)
 
 - **Iterations**: 20
-- **Total Time**: 92.91 ms
-- **Average Time**: 4.645 ms
-- **Min Time**: 4.385 ms
-- **Max Time**: 5.227 ms
-- **Operations per Second**: 215.27
+- **Total Time**: 25.46 ms
+- **Average Time**: 1.273 ms
+- **Min Time**: 1.150 ms
+- **Max Time**: 1.553 ms
+- **Operations per Second**: 785.49
 
 **Details:**
 - emailSize: 112096 bytes
@@ -106,11 +106,11 @@ Platform: win32 x64
 ### Email Canonicalization
 
 - **Iterations**: 1000
-- **Total Time**: 0.22 ms
+- **Total Time**: 0.18 ms
 - **Average Time**: 0.000 ms
 - **Min Time**: 0.000 ms
-- **Max Time**: 0.023 ms
-- **Operations per Second**: 4520795.66
+- **Max Time**: 0.011 ms
+- **Operations per Second**: 5408328.83
 
 **Details:**
 - bodyLength: 2850
@@ -118,11 +118,11 @@ Platform: win32 x64
 ### Bulk Signing (100 emails)
 
 - **Iterations**: 5
-- **Total Time**: 931.27 ms
-- **Average Time**: 186.254 ms
-- **Min Time**: 184.914 ms
-- **Max Time**: 187.608 ms
-- **Operations per Second**: 5.37
+- **Total Time**: 940.23 ms
+- **Average Time**: 188.045 ms
+- **Min Time**: 180.413 ms
+- **Max Time**: 199.499 ms
+- **Operations per Second**: 5.32
 
 **Details:**
 - emailCount: 100
@@ -131,11 +131,11 @@ Platform: win32 x64
 ### Bulk Verification (100 emails)
 
 - **Iterations**: 5
-- **Total Time**: 530.71 ms
-- **Average Time**: 106.142 ms
-- **Min Time**: 105.024 ms
-- **Max Time**: 107.101 ms
-- **Operations per Second**: 9.42
+- **Total Time**: 526.36 ms
+- **Average Time**: 105.272 ms
+- **Min Time**: 104.606 ms
+- **Max Time**: 106.229 ms
+- **Operations per Second**: 9.50
 
 **Details:**
 - emailCount: 100
@@ -151,17 +151,17 @@ Platform: win32 x64
 - **Operations per Second**: 0.00
 
 **Details:**
-- signingMemoryIncrease: 4.48 MB
-- verifyingMemoryIncrease: -0.96 MB
-- totalMemoryIncrease: 3.51 MB
+- signingMemoryIncrease: 4.42 MB
+- verifyingMemoryIncrease: -6.13 MB
+- totalMemoryIncrease: -1.71 MB
 
 ---
 
 ## Performance Analysis
 
-- Email signing takes an average of **2.57 ms**
+- Email signing takes an average of **2.51 ms**
   - ✅ **EXCELLENT**: Signing is very fast (<50ms)
-- Email verification takes an average of **1.29 ms**
+- Email verification takes an average of **1.31 ms**
   - ✅ **EXCELLENT**: Verification is very fast (<50ms)
 
 ---

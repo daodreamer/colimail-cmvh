@@ -1,6 +1,6 @@
 {
   "name": "colimail-cmvh",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "ColiMail Verification Header - Blockchain-based email authentication SDK",
   "type": "module",
   "main": "./dist/index.cjs",

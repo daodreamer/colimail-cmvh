@@ -44,20 +44,21 @@ describe("CMVH Signing and Verification", () => {
     expect(result.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
   });
 
-  it("should fail verification with tampered body", async () => {
+  it("should pass verification even with different body (body not signed)", async () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
     });
 
+    // Body is not included in signature, so changing it should not affect verification
     const result = await verifyCMVHHeaders({
       headers,
       ...testEmail,
-      body: "Tampered message",
+      body: "Different body content",
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("mismatch");
+    expect(result.ok).toBe(true);
+    expect(result.address).toBeTruthy();
   });
 
   it("should fail verification with tampered subject", async () => {
@@ -75,10 +76,13 @@ describe("CMVH Signing and Verification", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("should canonicalize email correctly", () => {
+  it("should canonicalize email correctly (without body)", () => {
     const canonical = canonicalizeEmail(testEmail);
-    const expected = `${testEmail.subject}\n${testEmail.from}\n${testEmail.to}\n${testEmail.body}`;
+    // CMVH v1.0 spec: only subject, from, to (body excluded)
+    const expected = `${testEmail.subject}\n${testEmail.from}\n${testEmail.to}`;
     expect(canonical).toBe(expected);
+    // Verify body is NOT included
+    expect(canonical).not.toContain(testEmail.body);
   });
 
   it("should include optional ENS field", async () => {

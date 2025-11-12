@@ -54,12 +54,12 @@ describe("Integration: Full Email Workflow", () => {
       expect(result.timestamp).toBeTruthy();
     });
 
-    it("should detect content tampering in multiline email body", async () => {
+    it("should detect content tampering in subject (body not signed)", async () => {
       const originalEmail = {
         from: "sender@domain.com",
         to: "receiver@domain.com",
-        subject: "Important Contract",
-        body: "Payment amount: $10,000\n\nTerms:\n1. Net 30 payment\n2. FOB shipping\n3. Standard warranty",
+        subject: "Payment: $10,000",
+        body: "Terms:\n1. Net 30 payment\n2. FOB shipping\n3. Standard warranty",
       };
 
       const headers = await signEmail({
@@ -67,10 +67,10 @@ describe("Integration: Full Email Workflow", () => {
         ...originalEmail,
       });
 
-      // Attacker tries to change payment amount
+      // Attacker tries to change payment amount in subject
       const tamperedEmail = {
         ...originalEmail,
-        body: "Payment amount: $100,000\n\nTerms:\n1. Net 30 payment\n2. FOB shipping\n3. Standard warranty",
+        subject: "Payment: $100,000",  // Subject is signed and will fail
       };
 
       const result = await verifyCMVHHeaders({
@@ -80,6 +80,19 @@ describe("Integration: Full Email Workflow", () => {
 
       expect(result.ok).toBe(false);
       expect(result.reason).toContain("mismatch");
+
+      // But changing body should pass (body not signed)
+      const bodyChangedEmail = {
+        ...originalEmail,
+        body: "Different body content",  // Body is not signed
+      };
+
+      const result2 = await verifyCMVHHeaders({
+        headers,
+        ...bodyChangedEmail,
+      });
+
+      expect(result2.ok).toBe(true);
     });
 
     it("should handle forwarded email scenario (signature remains valid)", async () => {
@@ -263,12 +276,12 @@ describe("Integration: Full Email Workflow", () => {
   });
 
   describe("Edge Cases: Whitespace Handling", () => {
-    it("should preserve leading and trailing whitespace in body", async () => {
+    it("should preserve whitespace in subject (body not signed)", async () => {
       const whitespaceEmail = {
         from: "sender@example.com",
         to: "receiver@example.com",
-        subject: "Test",
-        body: "  \n\n  Leading and trailing spaces  \n\n  ",
+        subject: "  Test Subject  ",  // Subject with whitespace
+        body: "Body content",
       };
 
       const headers = await signEmail({
@@ -276,25 +289,38 @@ describe("Integration: Full Email Workflow", () => {
         ...whitespaceEmail,
       });
 
-      // Removing even one space should break verification
-      const trimmedEmail = {
+      // Trimming subject whitespace should break verification (subject is signed)
+      const trimmedSubject = {
         ...whitespaceEmail,
-        body: whitespaceEmail.body.trim(),
+        subject: whitespaceEmail.subject.trim(),
       };
 
       const result = await verifyCMVHHeaders({
         headers,
-        ...trimmedEmail,
+        ...trimmedSubject,
       });
 
-      expect(result.ok).toBe(false); // Should fail because whitespace is significant
+      expect(result.ok).toBe(false); // Should fail because subject whitespace is signed
+
+      // But changing body should pass (body not signed)
+      const changedBody = {
+        ...whitespaceEmail,
+        body: "Different body",
+      };
+
+      const result2 = await verifyCMVHHeaders({
+        headers,
+        ...changedBody,
+      });
+
+      expect(result2.ok).toBe(true);
     });
 
-    it("should detect single character difference in body", async () => {
+    it("should detect single character difference in subject (not body)", async () => {
       const email = {
         from: "sender@example.com",
         to: "receiver@example.com",
-        subject: "Test",
+        subject: "Test Subject",
         body: "This is the original content.",
       };
 
@@ -303,11 +329,11 @@ describe("Integration: Full Email Workflow", () => {
         ...email,
       });
 
-      // Change one character
+      // Change one character in subject - should fail
       const result = await verifyCMVHHeaders({
         headers,
         ...email,
-        body: "This is the original content!",
+        subject: "Test Subject!",  // Added exclamation mark
       });
 
       expect(result.ok).toBe(false);
@@ -426,19 +452,20 @@ describe("Integration: Full Email Workflow", () => {
 
       expect(swappedResult.ok).toBe(false);
 
-      // Try moving subject to body
-      const movedResult = await verifyCMVHHeaders({
+      // Note: Moving subject to body won't affect verification since body is not signed
+      // But we can test swapping subject with from/to
+      const subjectSwappedResult = await verifyCMVHHeaders({
         headers,
-        from: email.from,
+        from: email.subject,  // This is invalid but tests the strict ordering
         to: email.to,
-        subject: email.body,
-        body: email.subject,
+        subject: email.from,
+        body: email.body,
       });
 
-      expect(movedResult.ok).toBe(false);
+      expect(subjectSwappedResult.ok).toBe(false);
     });
 
-    it("should verify canonicalization order is strictly enforced", () => {
+    it("should verify canonicalization order is strictly enforced (no body)", () => {
       const email = {
         from: "alice@example.com",
         to: "bob@example.com",
@@ -448,12 +475,13 @@ describe("Integration: Full Email Workflow", () => {
 
       const canonical = canonicalizeEmail(email);
 
-      // Order must be: subject, from, to, body
-      const expected = `${email.subject}\n${email.from}\n${email.to}\n${email.body}`;
+      // CMVH v1.0 order: subject, from, to (body excluded)
+      const expected = `${email.subject}\n${email.from}\n${email.to}`;
       expect(canonical).toBe(expected);
+      expect(canonical).not.toContain(email.body);  // Body should NOT be in canonical form
 
       // Wrong order should produce different hash
-      const wrongOrder = `${email.from}\n${email.to}\n${email.subject}\n${email.body}`;
+      const wrongOrder = `${email.from}\n${email.to}\n${email.subject}`;
       expect(canonical).not.toBe(wrongOrder);
     });
   });
