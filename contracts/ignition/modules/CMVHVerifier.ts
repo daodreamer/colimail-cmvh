@@ -1,21 +1,29 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 /**
- * CMVHVerifier Deployment Module
- *
- * This module deploys the CMVHVerifier contract using Hardhat Ignition.
+ * Ignition module for deploying CMVHVerifierV1 UUPS proxy
  *
  * Usage:
- * - Local deployment: npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts
- * - Testnet: npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts --network arbitrumSepolia
- * - Mainnet: npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts --network arbitrum
+ * npx hardhat ignition deploy ignition/modules/CMVHVerifier.ts --network arbitrumSepolia
  */
-export default buildModule("CMVHVerifierModule_V3", (m) => {
-  // Deploy CMVHVerifier contract
-  const verifier = m.contract("CMVHVerifier", [], {
-    // No constructor arguments needed
+export default buildModule("CMVHVerifier", (m) => {
+  // Get owner address (defaults to first account)
+  const owner = m.getParameter("owner", m.getAccount(0));
+
+  // Deploy implementation contract
+  const verifierImpl = m.contract("CMVHVerifierV1");
+
+  // Deploy proxy with empty initialization data
+  const verifierProxy = m.contract("ERC1967Proxy", [verifierImpl, "0x"], {
+    id: "VerifierProxy"
   });
 
-  // Return deployed contract instance
-  return { verifier };
+  // Get proxy as CMVHVerifierV1 interface
+  const proxiedVerifier = m.contractAt("CMVHVerifierV1", verifierProxy);
+
+  // Initialize through proxy
+  m.call(proxiedVerifier, "initialize", [owner]);
+
+  // Return proxy address for use in other modules
+  return { verifierProxy, proxiedVerifier };
 });

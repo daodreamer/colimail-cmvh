@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { network } from "hardhat";
-import { keccak256, type Hex, type Address } from "viem";
+import { keccak256, encodeFunctionData, type Hex, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
@@ -51,8 +51,22 @@ describe("CMVHVerifier", async function () {
   let signature: Hex;
 
   before(async function () {
-    // Deploy CMVHVerifier contract
-    verifier = await viem.deployContract("CMVHVerifier");
+    // Deploy CMVHVerifierV1 with proxy
+    const [owner] = await viem.getWalletClients();
+    const verifierImpl = await viem.deployContract("CMVHVerifierV1");
+
+    const verifierInitCalldata = encodeFunctionData({
+      abi: verifierImpl.abi,
+      functionName: "initialize",
+      args: [owner.account.address],
+    });
+
+    const verifierProxy = await viem.deployContract("TestProxy", [
+      verifierImpl.address,
+      verifierInitCalldata,
+    ]);
+
+    verifier = await viem.getContractAt("CMVHVerifierV1", verifierProxy.address);
 
     // Generate test signature
     emailHash = hashEmail(testEmail);

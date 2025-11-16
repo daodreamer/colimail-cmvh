@@ -1,30 +1,16 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
-import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 export default defineConfig({
-  plugins: [hardhatVerify, hardhatToolboxViemPlugin],
+  plugins: [hardhatToolboxViemPlugin],
   solidity: {
-    profiles: {
-      default: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
+    version: "0.8.28",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200, // Lower runs for better stack optimization
       },
-      production: {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000,
-          },
-          viaIR: true,
-        },
-      },
+      viaIR: true, // Enable IR optimizer to fix "stack too deep" errors
     },
   },
   networks: {
