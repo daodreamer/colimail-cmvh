@@ -1,6 +1,12 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
 
+/**
+ * Alternative Hardhat configuration with maximum stack optimization
+ * Use this if the default config still has stack issues
+ *
+ * To use: rename to hardhat.config.ts
+ */
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin],
   solidity: {
@@ -8,17 +14,30 @@ export default defineConfig({
     settings: {
       optimizer: {
         enabled: true,
-        runs: 10000, // Higher runs recommended for viaIR (better for stack optimization)
+        runs: 100000, // Maximum optimization for stack depth
         details: {
+          // Enable all safe optimizations
+          peephole: true,
+          inliner: true,
+          jumpdestRemover: true,
+          orderLiterals: true,
+          deduplicate: true,
+          cse: true,
+          constantOptimizer: true,
+          // Yul optimizer settings
           yul: true,
           yulDetails: {
             stackAllocation: true,
-            optimizerSteps: "dhfoDgvulfnTUtnIf"
+            optimizerSteps: "dhfoDgvulfnTUtnIf[xa[r]scLMcCTUtTOntnfDIulLculVcul[j]Tpeulxa[rul]xa[r]cLgvifCTUca[r]LSsTOtfDnca[r]Iulc]jmul[jul]VcTOcul jmul"
           }
         }
       },
-      viaIR: true, // Enable IR-based code generator for stack optimization
-      evmVersion: "shanghai", // Use latest stable EVM version
+      viaIR: true,
+      evmVersion: "shanghai",
+      // Additional metadata settings for size optimization
+      metadata: {
+        bytecodeHash: "none"
+      }
     },
   },
   networks: {
@@ -59,16 +78,16 @@ export default defineConfig({
     },
   },
   chainDescriptors: {
-        // Arbitrum Sepolia
-        421614: {
-          name: "Arbitrum Sepolia",
-          blockExplorers: {
-            etherscan: {
-              name: "Arbiscan Sepolia",
-              url: "https://sepolia.arbiscan.io",
-              apiUrl: "https://api-sepolia.arbiscan.io/api",
-            },
-          },
+    // Arbitrum Sepolia
+    421614: {
+      name: "Arbitrum Sepolia",
+      blockExplorers: {
+        etherscan: {
+          name: "Arbiscan Sepolia",
+          url: "https://sepolia.arbiscan.io",
+          apiUrl: "https://api-sepolia.arbiscan.io/api",
         },
-    }
+      },
+    },
+  }
 });
