@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title CMVHVerifier
@@ -25,14 +25,14 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
  * - MVP: No timestamp validation (Phase 3+)
  * - MVP: EOA only, no EIP-1271 support yet (Phase 3+)
  */
-contract CMVHVerifier {
+contract CMVHVerifier is Ownable {
     using ECDSA for bytes32;
 
     /// @notice Contract name for identification
-    string public constant name = "CMVHVerifier";
+    string public constant NAME = "CMVHVerifier";
 
     /// @notice Contract version
-    string public constant version = "1.0.0";
+    string public constant VERSION = "1.0.0";
 
     /// @notice Emitted when a signature is verified
     event SignatureVerified(
@@ -40,6 +40,12 @@ contract CMVHVerifier {
         bytes32 indexed emailHash,
         bool isValid
     );
+
+    /**
+     * @notice Constructor
+     * @param initialOwner The initial owner of the contract
+     */
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     /**
      * @notice Verify ECDSA signature for email content
@@ -85,10 +91,7 @@ contract CMVHVerifier {
         bytes memory signature
     ) public pure returns (bool isValid) {
         // Compute email hash using same canonicalization as SDK
-        bytes32 emailHash = hashEmail(subject, from, to);
-
-        // Verify signature
-        return verifySignature(signer, emailHash, signature);
+        return verifySignature(signer, hashEmail(subject, from, to), signature);
     }
 
     /**
@@ -105,14 +108,28 @@ contract CMVHVerifier {
         bytes32 emailHash,
         bytes memory signature
     ) public pure returns (address signer) {
-        // Use tryRecover for safe signature recovery
-        (address recovered, ECDSA.RecoverError error, ) = ECDSA.tryRecover(emailHash, signature);
-
-        // Return address(0) if recovery failed
-        if (error != ECDSA.RecoverError.NoError) {
+        if (signature.length != 65) {
             return address(0);
         }
 
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly ("memory-safe") {
+            r := mload(add(signature, 0x20))
+            s := mload(add(signature, 0x40))
+            v := byte(0, mload(add(signature, 0x60)))
+        }
+
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            return address(0);
+        }
+
+        if (v != 27 && v != 28) {
+            return address(0);
+        }
+
+        address recovered = ecrecover(emailHash, v, r, s);
         return recovered;
     }
 
@@ -139,18 +156,7 @@ contract CMVHVerifier {
         string calldata from,
         string calldata to
     ) public pure returns (bytes32 hash) {
-        // Canonicalize: subject\nfrom\nto
-        // Using abi.encodePacked for efficient string concatenation
-        bytes memory canonical = abi.encodePacked(
-            subject,
-            "\n",
-            from,
-            "\n",
-            to
-        );
-
-        // Hash canonicalized content
-        return keccak256(canonical);
+        return keccak256(abi.encodePacked(subject, "\n", from, "\n", to));
     }
 
     /**
@@ -169,15 +175,15 @@ contract CMVHVerifier {
         bytes32[] calldata emailHashes,
         bytes[] calldata signatures
     ) external pure returns (bool[] memory results) {
+        uint256 length = signers.length;
         require(
-            signers.length == emailHashes.length &&
-            emailHashes.length == signatures.length,
+            length == emailHashes.length && length == signatures.length,
             "CMVHVerifier: array length mismatch"
         );
 
-        results = new bool[](signers.length);
+        results = new bool[](length);
 
-        for (uint256 i = 0; i < signers.length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             results[i] = verifySignature(
                 signers[i],
                 emailHashes[i],
@@ -197,6 +203,6 @@ contract CMVHVerifier {
         string memory contractName,
         string memory contractVersion
     ) {
-        return (name, version);
+        return (NAME, VERSION);
     }
 }
