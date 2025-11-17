@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import hre from "hardhat";
 import { parseEther, keccak256, toHex, encodeAbiParameters } from "viem";
 import { signEmail } from "../../sdk/cmvh-js/dist/index.js";
-import { deployCMVHVerifierProxy } from "./helpers/deployProxy.js";
+import { deployCMVHVerifierProxy, deployCMVHRewardPoolProxy } from "./helpers/deployProxy.js";
 
 /**
  * CMVHRewardPool Test Suite (Hardhat 3.0 + Viem)
@@ -83,16 +83,17 @@ describe("CMVHRewardPool", async () => {
         WACT_TOKEN_DECIMALS,
       ]);
 
-      // Deploy CMVHVerifier (non-upgradeable)
+      // Deploy CMVHVerifier (UUPS upgradeable)
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      // Deploy RewardPool (non-upgradeable)
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      // Deploy RewardPool (UUPS upgradeable)
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       // Verify initialization parameters
       const wactToken = await rewardPool.read.wactToken();
@@ -159,12 +160,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       // Alice approves wACT
       await mockWACT.write.approve(
@@ -242,12 +244,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
       const tooSmallAmount = parseEther("0.005"); // Less than 0.01 wACT
@@ -293,12 +296,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -357,12 +361,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -409,12 +414,13 @@ describe("CMVHRewardPool", async () => {
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const newMinReward = parseEther("0.02");
 
@@ -447,12 +453,13 @@ describe("CMVHRewardPool", async () => {
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const newMinReward = parseEther("0.02");
 
@@ -481,12 +488,13 @@ describe("CMVHRewardPool", async () => {
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       // Pause contract
       await rewardPool.write.pause([], { account: owner.account });
@@ -522,12 +530,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -599,12 +608,13 @@ describe("CMVHRewardPool", async () => {
 
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+      const { rewardPool } = await deployCMVHRewardPoolProxy(
+        viem,
         mockWACT.address,
         verifier.address,
         feeCollector.account.address,
-        owner.account.address,
-      ]);
+        owner.account.address
+      );
 
       // Create two rewards from alice
       const emailHash1 = hashEmail(testEmail.subject + "1", testEmail.from, testEmail.to);

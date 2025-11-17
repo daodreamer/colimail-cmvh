@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./CMVHVerifier.sol";
@@ -11,10 +13,11 @@ import "./CMVHVerifier.sol";
 /**
  * @title CMVHRewardPool
  * @author ColiMail Labs (Dao Dreamer)
- * @notice Reward pool for CMVH email verification
+ * @notice UUPS upgradeable reward pool for CMVH email verification
  * @dev Implements reward creation, claiming, and cancellation with anti-fraud mechanisms
  *
  * Key Features:
+ * - UUPS upgradeable proxy pattern
  * - Email hash uniqueness (prevents replay attacks)
  * - Signature verification via CMVHVerifier
  * - Time-locked claiming (prevents front-running)
@@ -25,8 +28,15 @@ import "./CMVHVerifier.sol";
  * - Pausable for emergency stops
  * - Owner-controlled parameters
  * - SafeERC20 for token transfers
+ * - UUPS upgrade authorization (owner only)
  */
-contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
+contract CMVHRewardPool is
+    Initializable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable
+{
     using SafeERC20 for IERC20;
 
     // ============ Structs ============
@@ -77,6 +87,7 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
     event ProtocolFeeCollected(address indexed recipient, uint256 amount);
     event ParameterUpdated(string param, uint256 newValue);
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
+    event Upgraded(address indexed newImplementation);
 
     // ============ Errors ============
 
@@ -96,11 +107,11 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
 
     // ============ State Variables ============
 
-    /// @notice wACT token contract
-    IERC20 public immutable wactToken;
+    /// @notice wACT token contract (changed from immutable for upgradeable)
+    IERC20 public wactToken;
 
-    /// @notice CMVH Verifier contract for signature verification
-    CMVHVerifier public immutable verifier;
+    /// @notice CMVH Verifier contract for signature verification (changed from immutable)
+    CMVHVerifier public verifier;
 
     /// @notice Fee collector address
     address public feeCollector;
@@ -135,24 +146,34 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
     /// @notice Mapping of user address to their statistics
     mapping(address => UserStats) public userStats;
 
-    // ============ Constructor ============
+    // ============ Constructor & Initializer ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
-     * @notice Constructor
+     * @notice Initialize the contract (replaces constructor for upgradeable contracts)
      * @param _wactToken wACT token address
      * @param _verifier CMVHVerifier contract address
      * @param _feeCollector Fee collector address
      * @param initialOwner Initial owner address
      */
-    constructor(
+    function initialize(
         address _wactToken,
         address _verifier,
         address _feeCollector,
         address initialOwner
-    ) Ownable(initialOwner) {
+    ) public initializer {
         if (_wactToken == address(0)) revert InvalidRecipient();
         if (_verifier == address(0)) revert InvalidRecipient();
         if (_feeCollector == address(0)) revert InvalidRecipient();
+
+        __Ownable_init(initialOwner);
+        __Pausable_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         wactToken = IERC20(_wactToken);
         verifier = CMVHVerifier(_verifier);
@@ -163,6 +184,15 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
         maxExpiryDuration = 30 days;
         protocolFeePercent = 50; // 0.5%
         cancellationFeePercent = 100; // 1%
+    }
+
+    /**
+     * @notice Authorize upgrade to new implementation (UUPS pattern)
+     * @dev Only the owner can authorize upgrades
+     * @param newImplementation Address of the new implementation contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        emit Upgraded(newImplementation);
     }
 
     // ============ Core Functions ============
@@ -424,6 +454,14 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
      */
     function isEmailHashUsed(bytes32 emailHash) external view returns (bool) {
         return usedEmailHashes[emailHash];
+    }
+
+    /**
+     * @notice Get implementation version (for upgrade tracking)
+     * @return Current implementation version
+     */
+    function getImplementationVersion() external pure returns (string memory) {
+        return "1.0.0";
     }
 
     // ============ Admin Functions ============
