@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import hre from "hardhat";
 import { parseEther, keccak256, toHex, encodeAbiParameters } from "viem";
 import { signEmail } from "../../sdk/cmvh-js/dist/index.js";
+import { deployCMVHVerifierProxy } from "./helpers/deployProxy.js";
 
 /**
  * CMVHRewardPool Test Suite (Hardhat 3.0 + Viem)
@@ -60,13 +61,10 @@ describe("CMVHRewardPool", async () => {
   }
 
   /**
-   * Helper: Deploy CMVHVerifier (non-upgradeable)
+   * Helper: Deploy CMVHVerifier (UUPS upgradeable proxy)
    */
   async function deployCMVHVerifier(viem: any, owner: any) {
-    // Deploy non-upgradeable CMVHVerifier
-    const verifier = await viem.deployContract("CMVHVerifier", [
-      owner.account.address,
-    ]);
+    const { verifier } = await deployCMVHVerifierProxy(viem, owner.account.address);
     return verifier;
   }
 

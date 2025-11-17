@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { network } from "hardhat";
-import { keccak256, encodeAbiParameters, encodePacked, type Hex, type Address } from "viem";
+import { keccak256, encodeAbiParameters, encodePacked, encodeFunctionData, type Hex, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
- * CMVH Verifier Contract Tests
+ * CMVH Verifier Contract Tests (UUPS Upgradeable with Timestamp)
  *
  * Following TDD methodology from CMVH_DEV.md:
  * 1. Write tests first
@@ -13,13 +13,15 @@ import { privateKeyToAccount } from "viem/accounts";
  * 3. Test interoperability with SDK
  *
  * Test Coverage:
- * - Signature verification (EOA)
+ * - UUPS proxy deployment and initialization
+ * - Signature verification with timestamp (replay protection)
  * - Email hash verification
  * - Invalid signature rejection
+ * - Upgrade authorization
  * - Gas usage benchmarks
  */
 
-describe("CMVHVerifier", async function () {
+describe("CMVHVerifier (UUPS Upgradeable)", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
 
@@ -35,70 +37,153 @@ describe("CMVHVerifier", async function () {
     to: "bob@example.com",
   };
 
-  // Hash email content (using abi.encode to match contract)
-  function hashEmail(email: typeof testEmail): Hex {
+  const testTimestamp = Math.floor(Date.now() / 1000);
+
+  // EIP-712 constants matching contract
+  const EMAIL_TYPEHASH = keccak256("Email(string subject,string from,string to,uint256 timestamp)");
+
+  // Helper to get EIP-712 struct hash with timestamp
+  function getEmailStructHash(email: typeof testEmail, timestamp: number): Hex {
     return keccak256(encodeAbiParameters(
-      [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
-      [email.subject, email.from, email.to]
+      [
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'uint256' }
+      ],
+      [
+        EMAIL_TYPEHASH,
+        keccak256(email.subject),
+        keccak256(email.from),
+        keccak256(email.to),
+        BigInt(timestamp)
+      ]
     ));
   }
 
-  // Helper to create EIP-712 signature
-  async function signEmailEIP712(email: typeof testEmail, domainSeparator: Hex): Promise<Hex> {
-    const emailHash = hashEmail(email);
+  // Helper to create EIP-712 signature with timestamp
+  async function signEmailEIP712(
+    email: typeof testEmail,
+    timestamp: number,
+    domainSeparator: Hex
+  ): Promise<Hex> {
+    const structHash = getEmailStructHash(email, timestamp);
     const digest = keccak256(encodePacked(
       ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
-      ['0x19', '0x01', domainSeparator, emailHash]
+      ['0x19', '0x01', domainSeparator, structHash]
     ));
     return await testAccount.sign({ hash: digest });
   }
 
+  let implementation: any;
+  let proxy: any;
   let verifier: any;
-  let emailHash: Hex;
+  let emailStructHash: Hex;
   let signature: Hex;
   let domainSeparator: Hex;
+  let owner: any;
 
   before(async function () {
-    // Deploy CMVHVerifier (non-upgradeable)
-    const [owner] = await viem.getWalletClients();
-    verifier = await viem.deployContract("CMVHVerifier", [
-      owner.account.address,
-    ]);
+    // Get deployer/owner account
+    const walletClients = await viem.getWalletClients();
+    owner = walletClients[0];
 
-    // Get domain separator from contract
-    domainSeparator = await verifier.read.getDomainSeparator();
+    // Step 1: Deploy implementation
+    implementation = await viem.deployContract("CMVHVerifier", []);
 
-    // Generate test signature with EIP-712
-    emailHash = hashEmail(testEmail);
-    signature = await signEmailEIP712(testEmail, domainSeparator);
-  });
-
-  describe("Deployment", function () {
-    it("Should deploy successfully", async function () {
-      assert.ok(verifier.address);
-      assert.match(verifier.address, /^0x[0-9a-fA-F]{40}$/);
+    // Step 2: Encode initialize(owner) call
+    const initializeData = encodeFunctionData({
+      abi: implementation.abi,
+      functionName: 'initialize',
+      args: [owner.account.address]
     });
 
-    it("Should have correct contract name", async function () {
+    // Step 3: Deploy ERC1967Proxy
+    proxy = await viem.deployContract("ERC1967ProxyWrapper", [
+      implementation.address,
+      initializeData
+    ]);
+
+    // Step 4: Get verifier instance (proxy with implementation ABI)
+    verifier = await viem.getContractAt("CMVHVerifier", proxy.address);
+
+    // Get domain separator from proxied contract
+    domainSeparator = await verifier.read.getDomainSeparator();
+
+    // Generate test signature with EIP-712 and timestamp
+    emailStructHash = getEmailStructHash(testEmail, testTimestamp);
+    signature = await signEmailEIP712(testEmail, testTimestamp, domainSeparator);
+  });
+
+  describe("UUPS Proxy Deployment", function () {
+    it("Should deploy implementation successfully", async function () {
+      assert.ok(implementation.address);
+      assert.match(implementation.address, /^0x[0-9a-fA-F]{40}$/);
+    });
+
+    it("Should deploy proxy successfully", async function () {
+      assert.ok(proxy.address);
+      assert.match(proxy.address, /^0x[0-9a-fA-F]{40}$/);
+    });
+
+    it("Should initialize proxy with correct owner", async function () {
+      const contractOwner = await verifier.read.owner();
+      assert.equal(
+        contractOwner.toLowerCase(),
+        owner.account.address.toLowerCase(),
+        "Proxy should be initialized with correct owner"
+      );
+    });
+
+    it("Should have correct contract name through proxy", async function () {
       const name = await verifier.read.NAME();
       assert.equal(name, "CMVHVerifier");
     });
 
-    it("Should have correct version", async function () {
+    it("Should have correct version through proxy", async function () {
       const version = await verifier.read.VERSION();
       assert.equal(version, "2.0.0");
     });
   });
 
-  describe("Signature Verification", function () {
-    it("Should verify valid EOA signature", async function () {
+  describe("Signature Verification with Timestamp", function () {
+    it("Should verify valid EOA signature with timestamp", async function () {
       const isValid = await verifier.read.verifySignature([
         signerAddress,
-        emailHash,
+        emailStructHash,
         signature
       ]);
 
-      assert.equal(isValid, true, "Valid signature should be verified");
+      assert.equal(isValid, true, "Valid signature with timestamp should be verified");
+    });
+
+    it("Should verify complete email with timestamp", async function () {
+      const result = await verifier.read.verifyEmail([
+        signerAddress,
+        testEmail.subject,
+        testEmail.from,
+        testEmail.to,
+        testTimestamp,
+        signature
+      ]);
+
+      assert.equal(result, true, "Complete email with timestamp should be verified");
+    });
+
+    it("Should reject signature with different timestamp (replay protection)", async function () {
+      const differentTimestamp = testTimestamp + 3600; // +1 hour
+
+      const result = await verifier.read.verifyEmail([
+        signerAddress,
+        testEmail.subject,
+        testEmail.from,
+        testEmail.to,
+        differentTimestamp, // Different timestamp
+        signature // Same signature (should fail)
+      ]);
+
+      assert.equal(result, false, "Signature with different timestamp should be rejected");
     });
 
     it("Should reject invalid signature", async function () {
@@ -107,7 +192,7 @@ describe("CMVHVerifier", async function () {
 
       const isValid = await verifier.read.verifySignature([
         signerAddress,
-        emailHash,
+        emailStructHash,
         invalidSig
       ]);
 
@@ -119,47 +204,22 @@ describe("CMVHVerifier", async function () {
 
       const isValid = await verifier.read.verifySignature([
         wrongAddress,
-        emailHash,
+        emailStructHash,
         signature
       ]);
 
       assert.equal(isValid, false, "Signature with wrong address should be rejected");
     });
-
-    it("Should reject signature for tampered content", async function () {
-      // Create different email content (change subject)
-      const tamperedEmail = { ...testEmail, subject: "Tampered Subject" };
-      const tamperedHash = hashEmail(tamperedEmail);
-
-      const isValid = await verifier.read.verifySignature([
-        signerAddress,
-        tamperedHash,
-        signature
-      ]);
-
-      assert.equal(isValid, false, "Signature for different content should be rejected");
-    });
   });
 
-  describe("Email Hash Verification", function () {
-    it("Should verify complete email data against signature", async function () {
-      const result = await verifier.read.verifyEmail([
-        signerAddress,
-        testEmail.subject,
-        testEmail.from,
-        testEmail.to,
-        signature
-      ]);
-
-      assert.equal(result, true, "Complete email verification should succeed");
-    });
-
+  describe("Email Content Verification", function () {
     it("Should reject verification with tampered subject", async function () {
       const result = await verifier.read.verifyEmail([
         signerAddress,
         "Tampered Subject",
         testEmail.from,
         testEmail.to,
+        testTimestamp,
         signature
       ]);
 
@@ -172,56 +232,96 @@ describe("CMVHVerifier", async function () {
         testEmail.subject,
         "eve@malicious.com",
         testEmail.to,
+        testTimestamp,
         signature
       ]);
 
       assert.equal(result, false, "Tampered from address should fail verification");
     });
 
-    it("Should handle empty subject", async function () {
+    it("Should handle empty subject with timestamp", async function () {
       const emptySubjectEmail = { ...testEmail, subject: "" };
-      const sig = await signEmailEIP712(emptySubjectEmail, domainSeparator);
+      const ts = testTimestamp + 1;
+      const sig = await signEmailEIP712(emptySubjectEmail, ts, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
         "",
         testEmail.from,
         testEmail.to,
+        ts,
         sig
       ]);
 
-      assert.equal(result, true, "Empty subject should be valid");
+      assert.equal(result, true, "Empty subject with timestamp should be valid");
     });
 
-    it("Should handle Unicode content", async function () {
+    it("Should handle Unicode content with timestamp", async function () {
       const unicodeEmail = {
         subject: "测试邮件 🎉",
         from: "用户@example.com",
         to: "接收者@example.com",
       };
 
-      const sig = await signEmailEIP712(unicodeEmail, domainSeparator);
+      const ts = testTimestamp + 2;
+      const sig = await signEmailEIP712(unicodeEmail, ts, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
         unicodeEmail.subject,
         unicodeEmail.from,
         unicodeEmail.to,
+        ts,
         sig
       ]);
 
-      assert.equal(result, true, "Unicode content should be verified");
+      assert.equal(result, true, "Unicode content with timestamp should be verified");
+    });
+  });
+
+  describe("UUPS Upgrade Authorization", function () {
+    it("Should allow owner to call upgradeToAndCall", async function () {
+      // Deploy a new implementation (same contract for testing)
+      const newImpl = await viem.deployContract("CMVHVerifier", []);
+
+      // Owner should be able to upgrade
+      const hash = await verifier.write.upgradeToAndCall(
+        [newImpl.address, "0x"],
+        { account: owner.account }
+      );
+
+      assert.ok(hash, "Upgrade transaction should succeed");
+    });
+
+    it("Should prevent non-owner from upgrading", async function () {
+      const [, , nonOwner] = await viem.getWalletClients();
+      const newImpl = await viem.deployContract("CMVHVerifier", []);
+
+      try {
+        await verifier.write.upgradeToAndCall(
+          [newImpl.address, "0x"],
+          { account: nonOwner.account }
+        );
+        assert.fail("Non-owner upgrade should have been rejected");
+      } catch (error: any) {
+        assert.ok(
+          error.message.includes("OwnableUnauthorizedAccount") ||
+          error.message.includes("Ownable"),
+          "Should revert with Ownable error"
+        );
+      }
     });
   });
 
   describe("Gas Usage Benchmarks", function () {
     it("Should estimate gas for verifySignature", async function () {
-      // Estimate gas for view function call
+      // Estimate gas for state-changing function call
       const gasEstimate = await publicClient.estimateContractGas({
         address: verifier.address,
         abi: verifier.abi,
         functionName: "verifySignature",
-        args: [signerAddress, emailHash, signature]
+        args: [signerAddress, emailStructHash, signature],
+        account: owner.account
       });
 
       // Should be well under 100k gas as per Phase 2 requirements
@@ -231,7 +331,6 @@ describe("CMVHVerifier", async function () {
     });
 
     it("Should estimate gas for verifyEmail", async function () {
-      // Estimate gas for view function call
       const gasEstimate = await publicClient.estimateContractGas({
         address: verifier.address,
         abi: verifier.abi,
@@ -241,8 +340,10 @@ describe("CMVHVerifier", async function () {
           testEmail.subject,
           testEmail.from,
           testEmail.to,
+          testTimestamp,
           signature
-        ]
+        ],
+        account: owner.account
       });
 
       assert.ok(gasEstimate < 100000n, `Gas estimate (${gasEstimate}) should be < 100k`);
@@ -251,72 +352,63 @@ describe("CMVHVerifier", async function () {
     });
   });
 
+  describe("View Functions", function () {
+    it("Should compute correct email struct hash", async function () {
+      const computed = await verifier.read.getEmailStructHash([
+        testEmail.subject,
+        testEmail.from,
+        testEmail.to,
+        testTimestamp
+      ]);
+
+      assert.equal(computed, emailStructHash, "Contract should compute same hash as test");
+    });
+
+    it("Should get implementation version", async function () {
+      const version = await verifier.read.getImplementationVersion();
+      assert.equal(version, "2.0.0", "Should return correct implementation version");
+    });
+  });
+
   describe("Edge Cases", function () {
-    it("Should handle very long subject", async function () {
+    it("Should handle very long subject with timestamp", async function () {
       const longSubject = "A".repeat(1000);
       const longEmail = { ...testEmail, subject: longSubject };
-      const sig = await signEmailEIP712(longEmail, domainSeparator);
+      const ts = testTimestamp + 3;
+      const sig = await signEmailEIP712(longEmail, ts, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
         longEmail.subject,
         longEmail.from,
         longEmail.to,
+        ts,
         sig
       ]);
 
-      assert.equal(result, true, "Long subject should be verified");
+      assert.equal(result, true, "Long subject with timestamp should be verified");
     });
 
-    it("Should handle special characters in email fields", async function () {
+    it("Should handle special characters with timestamp", async function () {
       const specialEmail = {
         subject: "Re: [URGENT] <Test> & 'Quote'",
         from: "user+tag@sub.example.com",
         to: "recipient@example.co.uk",
       };
 
-      const sig = await signEmailEIP712(specialEmail, domainSeparator);
+      const ts = testTimestamp + 4;
+      const sig = await signEmailEIP712(specialEmail, ts, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
         specialEmail.subject,
         specialEmail.from,
         specialEmail.to,
+        ts,
         sig
       ]);
 
-      assert.equal(result, true, "Special characters should be handled correctly");
-    });
-  });
-
-  describe("View Functions", function () {
-    it("Should recover signer address from valid signature", async function () {
-      // recoverSigner expects the EIP-712 digest, not just the emailHash
-      const digest = keccak256(encodePacked(
-        ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
-        ['0x19', '0x01', domainSeparator, emailHash]
-      ));
-
-      const recovered = await verifier.read.recoverSigner([
-        digest,
-        signature
-      ]);
-
-      assert.equal(
-        recovered.toLowerCase(),
-        signerAddress.toLowerCase(),
-        "Should recover correct signer address"
-      );
-    });
-
-    it("Should compute correct email hash", async function () {
-      const computed = await verifier.read.hashEmail([
-        testEmail.subject,
-        testEmail.from,
-        testEmail.to
-      ]);
-
-      assert.equal(computed, emailHash, "Contract should compute same hash as SDK");
+      assert.equal(result, true, "Special characters with timestamp should be handled");
     });
   });
 });

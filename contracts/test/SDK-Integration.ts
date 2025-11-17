@@ -5,6 +5,7 @@ import { type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { deployCMVHVerifierProxy } from "./helpers/deployProxy.js";
 
 /**
  * SDK-Contract Integration Tests
@@ -36,11 +37,10 @@ describe("SDK-Contract Integration", async function () {
   let verifier: any;
 
   before(async function () {
-    // Deploy CMVHVerifier (non-upgradeable)
+    // Deploy CMVHVerifier (UUPS upgradeable proxy)
     const [owner] = await viem.getWalletClients();
-    verifier = await viem.deployContract("CMVHVerifier", [
-      owner.account.address,
-    ]);
+    const deployed = await deployCMVHVerifierProxy(viem, owner.account.address);
+    verifier = deployed.verifier;
 
     // Try to import SDK (skip if not built)
     try {
