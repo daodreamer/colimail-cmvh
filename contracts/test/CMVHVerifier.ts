@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { network } from "hardhat";
-import { keccak256, encodeFunctionData, type Hex, type Address } from "viem";
+import { keccak256, type Hex, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
@@ -51,22 +51,11 @@ describe("CMVHVerifier", async function () {
   let signature: Hex;
 
   before(async function () {
-    // Deploy CMVHVerifierV1 with proxy
+    // Deploy CMVHVerifier (non-upgradeable)
     const [owner] = await viem.getWalletClients();
-    const verifierImpl = await viem.deployContract("CMVHVerifierV1");
-
-    const verifierInitCalldata = encodeFunctionData({
-      abi: verifierImpl.abi,
-      functionName: "initialize",
-      args: [owner.account.address],
-    });
-
-    const verifierProxy = await viem.deployContract("TestProxy", [
-      verifierImpl.address,
-      verifierInitCalldata,
+    verifier = await viem.deployContract("CMVHVerifier", [
+      owner.account.address,
     ]);
-
-    verifier = await viem.getContractAt("CMVHVerifierV1", verifierProxy.address);
 
     // Generate test signature
     emailHash = hashEmail(testEmail);
@@ -80,12 +69,12 @@ describe("CMVHVerifier", async function () {
     });
 
     it("Should have correct contract name", async function () {
-      const name = await verifier.read.name();
+      const name = await verifier.read.NAME();
       assert.equal(name, "CMVHVerifier");
     });
 
     it("Should have correct version", async function () {
-      const version = await verifier.read.version();
+      const version = await verifier.read.VERSION();
       assert.equal(version, "1.0.0");
     });
   });

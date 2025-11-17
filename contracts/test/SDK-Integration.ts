@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { network } from "hardhat";
-import { encodeFunctionData, type Hex } from "viem";
+import { type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -36,22 +36,11 @@ describe("SDK-Contract Integration", async function () {
   let verifier: any;
 
   before(async function () {
-    // Deploy CMVHVerifierV1 with proxy
+    // Deploy CMVHVerifier (non-upgradeable)
     const [owner] = await viem.getWalletClients();
-    const verifierImpl = await viem.deployContract("CMVHVerifierV1");
-
-    const verifierInitCalldata = encodeFunctionData({
-      abi: verifierImpl.abi,
-      functionName: "initialize",
-      args: [owner.account.address],
-    });
-
-    const verifierProxy = await viem.deployContract("TestProxy", [
-      verifierImpl.address,
-      verifierInitCalldata,
+    verifier = await viem.deployContract("CMVHVerifier", [
+      owner.account.address,
     ]);
-
-    verifier = await viem.getContractAt("CMVHVerifierV1", verifierProxy.address);
 
     // Try to import SDK (skip if not built)
     try {

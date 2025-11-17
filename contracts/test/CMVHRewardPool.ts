@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import hre from "hardhat";
-import { parseEther, keccak256, toHex, encodeFunctionData } from "viem";
+import { parseEther, keccak256, toHex } from "viem";
 import { signEmail } from "../../sdk/cmvh-js/dist/index.js";
 
 /**
@@ -57,27 +57,14 @@ describe("CMVHRewardPool", async () => {
   }
 
   /**
-   * Helper: Deploy CMVHVerifierV1 with proxy
+   * Helper: Deploy CMVHVerifier (non-upgradeable)
    */
   async function deployCMVHVerifier(viem: any, owner: any) {
-    // Deploy implementation
-    const verifierImpl = await viem.deployContract("CMVHVerifierV1");
-
-    // Encode initialize calldata
-    const verifierInitCalldata = encodeFunctionData({
-      abi: verifierImpl.abi,
-      functionName: "initialize",
-      args: [owner.account.address],
-    });
-
-    // Deploy proxy
-    const verifierProxy = await viem.deployContract("TestProxy", [
-      verifierImpl.address,
-      verifierInitCalldata,
+    // Deploy non-upgradeable CMVHVerifier
+    const verifier = await viem.deployContract("CMVHVerifier", [
+      owner.account.address,
     ]);
-
-    // Get contract instance at proxy address
-    return await viem.getContractAt("CMVHVerifierV1", verifierProxy.address);
+    return verifier;
   }
 
   describe("Deployment and Initialization", async () => {
@@ -95,35 +82,16 @@ describe("CMVHRewardPool", async () => {
         WACT_TOKEN_DECIMALS,
       ]);
 
-      // Deploy CMVHVerifier with proxy
+      // Deploy CMVHVerifier (non-upgradeable)
       const verifier = await deployCMVHVerifier(viem, owner);
 
-      // Deploy RewardPool Implementation
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
-
-      // Encode initialize calldata
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      // Deploy Proxy
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      // Deploy RewardPool (non-upgradeable)
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      // Get contract at proxy address
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       // Verify initialization parameters
       const wactToken = await rewardPool.read.wactToken();
@@ -189,28 +157,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       // Alice approves wACT
       await mockWACT.write.approve(
@@ -287,28 +240,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
       const tooSmallAmount = parseEther("0.005"); // Less than 0.01 wACT
@@ -353,28 +291,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -432,28 +355,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -499,28 +407,13 @@ describe("CMVHRewardPool", async () => {
         WACT_TOKEN_DECIMALS,
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const newMinReward = parseEther("0.02");
 
@@ -552,28 +445,13 @@ describe("CMVHRewardPool", async () => {
         WACT_TOKEN_DECIMALS,
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const newMinReward = parseEther("0.02");
 
@@ -601,28 +479,13 @@ describe("CMVHRewardPool", async () => {
         WACT_TOKEN_DECIMALS,
       ]);
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       // Pause contract
       await rewardPool.write.pause([], { account: owner.account });
@@ -657,28 +520,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       const emailHash = hashEmail(testEmail.subject, testEmail.from, testEmail.to);
 
@@ -749,28 +597,13 @@ describe("CMVHRewardPool", async () => {
       await mockWACT.write.mint([alice.account.address, parseEther("1000")]);
 
       const verifier = await deployCMVHVerifier(viem, owner);
-      const implementation = await viem.deployContract("CMVHRewardPoolV1");
 
-      const initializeCalldata = encodeFunctionData({
-        abi: implementation.abi,
-        functionName: "initialize",
-        args: [
-          mockWACT.address,
-          verifier.address,
-          feeCollector.account.address,
-          owner.account.address,
-        ],
-      });
-
-      const proxy = await viem.deployContract("TestProxy", [
-        implementation.address,
-        initializeCalldata,
+      const rewardPool = await viem.deployContract("CMVHRewardPool", [
+        mockWACT.address,
+        verifier.address,
+        feeCollector.account.address,
+        owner.account.address,
       ]);
-
-      const rewardPool = await viem.getContractAt(
-        "CMVHRewardPoolV1",
-        proxy.address
-      );
 
       // Create two rewards from alice
       const emailHash1 = hashEmail(testEmail.subject + "1", testEmail.from, testEmail.to);
