@@ -76,6 +76,7 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
 
     event ProtocolFeeCollected(address indexed recipient, uint256 amount);
     event ParameterUpdated(string param, uint256 newValue);
+    event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
 
     // ============ Errors ============
 
@@ -212,7 +213,8 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
     ) private view {
         if (recipient == address(0)) revert InvalidRecipient();
         if (amount < minRewardAmount) revert InvalidAmount();
-        if (expiryDuration == 0 || expiryDuration > maxExpiryDuration) {
+        // Ensure expiry is long enough to allow claiming (CLAIM_DELAY + 1 hour buffer)
+        if (expiryDuration < CLAIM_DELAY + 1 hours || expiryDuration > maxExpiryDuration) {
             revert InvalidExpiryDuration();
         }
         if (usedEmailHashes[emailHash]) revert EmailHashAlreadyUsed();
@@ -270,6 +272,7 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
 
     /**
      * @notice Claim a reward by verifying email signature
+     * @dev Can be called even when paused to allow users to withdraw funds
      */
     function claimReward(
         bytes32 rewardId,
@@ -278,7 +281,7 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
         string calldata subject,
         string calldata from,
         string calldata to
-    ) external whenNotPaused nonReentrant {
+    ) external nonReentrant {
         RewardInfo storage reward = rewards[rewardId];
 
         // Validate reward can be claimed
@@ -317,8 +320,13 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
         userStats[reward.sender].activeRewards--;
         userStats[reward.recipient].activeRewards--;
 
-        uint256 fee = (reward.amount * protocolFeePercent) / 10000;
+        // Cache state variables to save gas
+        uint256 _protocolFeePercent = protocolFeePercent;
+        uint256 fee = (reward.amount * _protocolFeePercent) / 10000;
         uint256 netAmount = reward.amount - fee;
+
+        // Clear email hash to allow reuse (fixes DoS vulnerability)
+        delete usedEmailHashes[reward.emailHash];
 
         if (fee > 0) {
             wactToken.safeTransfer(feeCollector, fee);
@@ -331,8 +339,9 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
 
     /**
      * @notice Cancel an expired reward
+     * @dev Can be called even when paused to allow users to withdraw funds
      */
-    function cancelReward(bytes32 rewardId) external whenNotPaused nonReentrant {
+    function cancelReward(bytes32 rewardId) external nonReentrant {
         RewardInfo storage reward = rewards[rewardId];
 
         // Validate
@@ -349,11 +358,16 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
         bytes32 rewardId,
         RewardInfo storage reward
     ) private {
-        uint256 cancelFee = (reward.amount * cancellationFeePercent) / 10000;
+        // Cache state variables to save gas
+        uint256 _cancellationFeePercent = cancellationFeePercent;
+        uint256 cancelFee = (reward.amount * _cancellationFeePercent) / 10000;
         uint256 refundAmount = reward.amount - cancelFee;
 
         userStats[reward.sender].activeRewards--;
         userStats[reward.recipient].activeRewards--;
+
+        // Clear email hash to allow reuse (fixes DoS vulnerability)
+        delete usedEmailHashes[reward.emailHash];
 
         delete rewards[rewardId];
 
@@ -453,7 +467,9 @@ contract CMVHRewardPool is Ownable, Pausable, ReentrancyGuard {
      */
     function setFeeCollector(address collector) external onlyOwner {
         if (collector == address(0)) revert InvalidRecipient();
+        address oldCollector = feeCollector;
         feeCollector = collector;
+        emit FeeCollectorUpdated(oldCollector, collector);
     }
 
     /**

@@ -1,43 +1,49 @@
 /**
  * Email Canonicalization for CMVH
  *
- * CMVH Spec v1.0:
- * canonical = SUBJECT + "\n" + FROM + "\n" + TO
+ * CMVH Spec v2.0 (EIP-712):
+ * Uses abi.encode for collision-resistant hashing
  *
  * NOTE: Body is intentionally excluded to avoid HTML formatting issues.
- * This matches the production implementation in ColiMail client (Rust).
  */
 
-import type { EmailContent } from "./types.js";
+import { encodeAbiParameters } from "viem";
+import type { EmailContent, HexString } from "./types.js";
+import { keccak256 } from "./crypto.js";
 
 /**
- * Canonicalize email content into deterministic string
+ * Hash email content using abi.encode (EIP-712 compatible)
  *
  * @param content - Email content (from, to, subject, body ignored)
- * @returns Canonical string ready for hashing
+ * @returns keccak256 hash of abi-encoded email fields
  *
  * @remarks
- * The body field is intentionally excluded from canonicalization to avoid
- * issues with HTML formatting, whitespace normalization, and encoding differences.
- * Only metadata (subject, from, to) is signed.
+ * v2.0 Update: Uses abi.encode instead of string concatenation to prevent
+ * collision attacks from embedded newlines or control characters.
+ * The body field is intentionally excluded from canonicalization.
  *
  * @example
  * ```ts
- * const canonical = canonicalizeEmail({
+ * const hash = hashEmail({
  *   from: "alice@gmail.com",
  *   to: "bob@outlook.com",
  *   subject: "Hello",
- *   body: "Test message"  // Body is ignored in canonicalization
+ *   body: "Test message"  // Body is ignored
  * });
- * // Returns: "Hello\nalice@gmail.com\nbob@outlook.com"
+ * // Returns: 0x... (32-byte hash)
  * ```
  */
-export function canonicalizeEmail(content: EmailContent): string {
+export function hashEmail(content: EmailContent): HexString {
   const { subject, from, to } = content;
 
-  // Simple concatenation with newline separators
-  // Order: subject, from, to (body excluded by design)
-  return `${subject}\n${from}\n${to}`;
+  // Use abi.encode for collision-resistant encoding
+  // This matches the contract's hashEmail function
+  const encoded = encodeAbiParameters(
+    [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
+    [subject, from, to]
+  );
+
+  return keccak256(encoded);
 }
 
 /**

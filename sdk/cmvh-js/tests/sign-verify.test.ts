@@ -1,11 +1,11 @@
 /**
- * Test suite for CMVH signing and verification
+ * Test suite for CMVH signing and verification (EIP-712 v2.0)
  */
 
 import { describe, it, expect } from "vitest";
-import { signEmail, verifyCMVHHeaders, canonicalizeEmail } from "../src/index.js";
+import { signEmail, verifyCMVHHeaders } from "../src/index.js";
 
-describe("CMVH Signing and Verification", () => {
+describe("CMVH Signing and Verification (EIP-712 v2.0)", () => {
   const testPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
   const testEmail = {
     from: "alice@example.com",
@@ -13,14 +13,18 @@ describe("CMVH Signing and Verification", () => {
     subject: "Test Email",
     body: "Hello, this is a test message.",
   };
+  const testChainId = 42161; // Arbitrum
+  const testVerifyingContract = "0x5FbDB2315678afecb367f032d93F642f64180aa3" as const;
 
   it("should sign an email and generate valid CMVH headers", async () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
-    expect(headers["X-CMVH-Version"]).toBe("1");
+    expect(headers["X-CMVH-Version"]).toBe("2");
     expect(headers["X-CMVH-Address"]).toMatch(/^0x[a-fA-F0-9]{40}$/);
     expect(headers["X-CMVH-Chain"]).toBe("Arbitrum");
     expect(headers["X-CMVH-HashAlgo"]).toBe("keccak256");
@@ -32,11 +36,15 @@ describe("CMVH Signing and Verification", () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     const result = await verifyCMVHHeaders({
       headers,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     expect(result.ok).toBe(true);
@@ -48,6 +56,8 @@ describe("CMVH Signing and Verification", () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     // Body is not included in signature, so changing it should not affect verification
@@ -55,6 +65,8 @@ describe("CMVH Signing and Verification", () => {
       headers,
       ...testEmail,
       body: "Different body content",
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     expect(result.ok).toBe(true);
@@ -65,30 +77,27 @@ describe("CMVH Signing and Verification", () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     const result = await verifyCMVHHeaders({
       headers,
       ...testEmail,
       subject: "Different Subject",
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     expect(result.ok).toBe(false);
-  });
-
-  it("should canonicalize email correctly (without body)", () => {
-    const canonical = canonicalizeEmail(testEmail);
-    // CMVH v1.0 spec: only subject, from, to (body excluded)
-    const expected = `${testEmail.subject}\n${testEmail.from}\n${testEmail.to}`;
-    expect(canonical).toBe(expected);
-    // Verify body is NOT included
-    expect(canonical).not.toContain(testEmail.body);
   });
 
   it("should include optional ENS field", async () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
       ens: "alice.eth",
     });
 
@@ -97,6 +106,8 @@ describe("CMVH Signing and Verification", () => {
     const result = await verifyCMVHHeaders({
       headers,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     expect(result.ok).toBe(true);
@@ -107,6 +118,8 @@ describe("CMVH Signing and Verification", () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...testEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
       reward: "0.05 wACT",
     });
 
@@ -118,11 +131,15 @@ describe("CMVH Signing and Verification", () => {
     const headers = await signEmail({
       privateKey: testPrivateKey,
       ...emptyBodyEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     const result = await verifyCMVHHeaders({
       headers,
       ...emptyBodyEmail,
+      chainId: testChainId,
+      verifyingContract: testVerifyingContract,
     });
 
     expect(result.ok).toBe(true);
@@ -136,7 +153,19 @@ describe("CMVH Signing and Verification", () => {
         to: testEmail.to,
         subject: testEmail.subject,
         body: testEmail.body,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
       })
     ).rejects.toThrow();
+  });
+
+  it("should reject missing verifyingContract", async () => {
+    await expect(
+      signEmail({
+        privateKey: testPrivateKey,
+        ...testEmail,
+        chainId: testChainId,
+      })
+    ).rejects.toThrow("Missing verifyingContract");
   });
 });

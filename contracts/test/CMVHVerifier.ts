@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
 import { network } from "hardhat";
-import { keccak256, type Hex, type Address } from "viem";
+import { keccak256, encodeAbiParameters, encodePacked, type Hex, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 /**
@@ -35,20 +35,28 @@ describe("CMVHVerifier", async function () {
     to: "bob@example.com",
   };
 
-  // Canonicalize email (matching SDK algorithm: subject\nfrom\nto - body excluded)
-  function canonicalizeEmail(email: typeof testEmail): string {
-    return `${email.subject}\n${email.from}\n${email.to}`;
+  // Hash email content (using abi.encode to match contract)
+  function hashEmail(email: typeof testEmail): Hex {
+    return keccak256(encodeAbiParameters(
+      [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
+      [email.subject, email.from, email.to]
+    ));
   }
 
-  // Hash email content
-  function hashEmail(email: typeof testEmail): Hex {
-    const canonical = canonicalizeEmail(email);
-    return keccak256(new TextEncoder().encode(canonical));
+  // Helper to create EIP-712 signature
+  async function signEmailEIP712(email: typeof testEmail, domainSeparator: Hex): Promise<Hex> {
+    const emailHash = hashEmail(email);
+    const digest = keccak256(encodePacked(
+      ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
+      ['0x19', '0x01', domainSeparator, emailHash]
+    ));
+    return await testAccount.sign({ hash: digest });
   }
 
   let verifier: any;
   let emailHash: Hex;
   let signature: Hex;
+  let domainSeparator: Hex;
 
   before(async function () {
     // Deploy CMVHVerifier (non-upgradeable)
@@ -57,9 +65,12 @@ describe("CMVHVerifier", async function () {
       owner.account.address,
     ]);
 
-    // Generate test signature
+    // Get domain separator from contract
+    domainSeparator = await verifier.read.getDomainSeparator();
+
+    // Generate test signature with EIP-712
     emailHash = hashEmail(testEmail);
-    signature = await testAccount.sign({ hash: emailHash });
+    signature = await signEmailEIP712(testEmail, domainSeparator);
   });
 
   describe("Deployment", function () {
@@ -75,7 +86,7 @@ describe("CMVHVerifier", async function () {
 
     it("Should have correct version", async function () {
       const version = await verifier.read.VERSION();
-      assert.equal(version, "1.0.0");
+      assert.equal(version, "2.0.0");
     });
   });
 
@@ -169,8 +180,7 @@ describe("CMVHVerifier", async function () {
 
     it("Should handle empty subject", async function () {
       const emptySubjectEmail = { ...testEmail, subject: "" };
-      const hash = hashEmail(emptySubjectEmail);
-      const sig = await testAccount.sign({ hash });
+      const sig = await signEmailEIP712(emptySubjectEmail, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
@@ -190,8 +200,7 @@ describe("CMVHVerifier", async function () {
         to: "接收者@example.com",
       };
 
-      const hash = hashEmail(unicodeEmail);
-      const sig = await testAccount.sign({ hash });
+      const sig = await signEmailEIP712(unicodeEmail, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
@@ -246,8 +255,7 @@ describe("CMVHVerifier", async function () {
     it("Should handle very long subject", async function () {
       const longSubject = "A".repeat(1000);
       const longEmail = { ...testEmail, subject: longSubject };
-      const hash = hashEmail(longEmail);
-      const sig = await testAccount.sign({ hash });
+      const sig = await signEmailEIP712(longEmail, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
@@ -267,8 +275,7 @@ describe("CMVHVerifier", async function () {
         to: "recipient@example.co.uk",
       };
 
-      const hash = hashEmail(specialEmail);
-      const sig = await testAccount.sign({ hash });
+      const sig = await signEmailEIP712(specialEmail, domainSeparator);
 
       const result = await verifier.read.verifyEmail([
         signerAddress,
@@ -284,8 +291,14 @@ describe("CMVHVerifier", async function () {
 
   describe("View Functions", function () {
     it("Should recover signer address from valid signature", async function () {
+      // recoverSigner expects the EIP-712 digest, not just the emailHash
+      const digest = keccak256(encodePacked(
+        ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
+        ['0x19', '0x01', domainSeparator, emailHash]
+      ));
+
       const recovered = await verifier.read.recoverSigner([
-        emailHash,
+        digest,
         signature
       ]);
 

@@ -79,7 +79,7 @@ X-CMVH-ENS: alice.eth
   });
 
   it("should reject unsupported version", () => {
-    const invalid = { ...validHeaders, version: "2" };
+    const invalid = { ...validHeaders, version: "99" };
 
     expect(() => validateCMVHHeaders(invalid)).toThrow("Unsupported CMVH version");
   });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import hre from "hardhat";
-import { parseEther, keccak256, toHex } from "viem";
+import { parseEther, keccak256, toHex, encodeAbiParameters } from "viem";
 import { signEmail } from "../../sdk/cmvh-js/dist/index.js";
 
 /**
@@ -34,11 +34,14 @@ describe("CMVHRewardPool", async () => {
   };
 
   /**
-   * Helper: Create email hash
+   * Helper: Create email hash (using abi.encode to match contract)
    */
   function hashEmail(subject: string, from: string, to: string): `0x${string}` {
-    const canonical = `${subject}\n${from}\n${to}`;
-    return keccak256(toHex(canonical));
+    // Use abi.encode to match the contract's hashEmail function (changed from abi.encodePacked)
+    return keccak256(encodeAbiParameters(
+      [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
+      [subject, from, to]
+    ));
   }
 
   /**

@@ -1,10 +1,10 @@
 /**
  * CMVH Type Definitions
- * Spec Version: 1.0.0
+ * Spec Version: 2.0.0 (EIP-712)
  */
 
-export const SPEC_VERSION = "1.0.0";
-export const LIB_VERSION = "1.0.0";
+export const SPEC_VERSION = "2.0.0";
+export const LIB_VERSION = "2.0.0";
 
 export type HexString = `0x${string}`;
 export type Address = HexString;
@@ -37,7 +37,7 @@ export interface CMVHHeaders extends Record<string, string | undefined> {
 }
 
 /**
- * Input for email signing
+ * Input for email signing (EIP-712 v2.0)
  */
 export interface SignEmailInput {
   privateKey: HexString;
@@ -47,6 +47,8 @@ export interface SignEmailInput {
   body: string;
   timestamp?: number;
   chain?: ChainName;
+  chainId?: number;
+  verifyingContract?: Address;
   ens?: string;
   reward?: string;
   proofURL?: string;

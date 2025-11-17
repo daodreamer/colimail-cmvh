@@ -1,19 +1,25 @@
 /**
- * CMVH Email Verification
+ * CMVH Email Verification (EIP-712 v2.0)
  */
 
-import type { VerificationResult, ParsedCMVHHeaders, RawHeaders, CMVHHeaders } from "./types.js";
+import type { VerificationResult, ParsedCMVHHeaders, RawHeaders, CMVHHeaders, Address } from "./types.js";
 import { parseRawHeaders, validateCMVHHeaders } from "./headers.js";
-import { canonicalizeEmail } from "./canonicalize.js";
-import { keccak256, recoverAddress } from "./crypto.js";
+import {
+  recoverAddress,
+  getDomainSeparator,
+  getEmailStructHash,
+  getEIP712Digest
+} from "./crypto.js";
 
 /**
- * Verify CMVH headers against email body
- * 
+ * Verify CMVH headers against email body with EIP-712
+ *
  * @param headers - Raw headers or parsed CMVH headers
  * @param emailContent - Email content (from, to, subject, body)
+ * @param chainId - Chain ID (required for EIP-712)
+ * @param verifyingContract - Contract address (required for EIP-712)
  * @returns Verification result with recovered address
- * 
+ *
  * @example
  * ```ts
  * const result = await verifyCMVHHeaders({
@@ -21,9 +27,11 @@ import { keccak256, recoverAddress } from "./crypto.js";
  *   body: emailBody,
  *   from: "alice@gmail.com",
  *   to: "bob@outlook.com",
- *   subject: "Test"
+ *   subject: "Test",
+ *   chainId: 42161,
+ *   verifyingContract: "0x..."
  * });
- * 
+ *
  * if (result.ok) {
  *   console.log("✅ Verified from:", result.address);
  * }
@@ -35,9 +43,18 @@ export async function verifyCMVHHeaders(params: {
   to: string;
   subject: string;
   body: string;
+  chainId?: number;
+  verifyingContract?: Address;
 }): Promise<VerificationResult> {
   try {
-    const { headers: rawHeaders, from, to, subject, body } = params;
+    const {
+      headers: rawHeaders,
+      from,
+      to,
+      subject,
+      chainId,
+      verifyingContract
+    } = params;
 
     // Parse headers if needed
     const headers = isParsedHeaders(rawHeaders)
@@ -54,32 +71,58 @@ export async function verifyCMVHHeaders(params: {
       };
     }
 
-    // Canonicalize email content
-    const canonical = canonicalizeEmail({ from, to, subject, body });
+    // Check version and use appropriate verification method
+    const version = headers.version || "1";
 
-    // Hash canonical string
-    const hash = keccak256(canonical);
+    if (version === "2") {
+      // EIP-712 verification (v2.0)
+      if (!chainId || !verifyingContract) {
+        return {
+          ok: false,
+          reason: "Missing chainId or verifyingContract for EIP-712 verification (v2.0)",
+        };
+      }
 
-    // Recover address from signature
-    const recoveredAddress = await recoverAddress(hash, headers.signature!);
+      // Get timestamp from headers
+      const timestamp = headers.timestamp ? parseInt(headers.timestamp, 10) : 0;
 
-    // Compare with claimed address
-    const addressMatch = recoveredAddress.toLowerCase() === headers.address!.toLowerCase();
+      // Get EIP-712 struct hash (includes timestamp for replay protection)
+      const emailStructHash = getEmailStructHash(subject, from, to, timestamp);
 
-    if (!addressMatch) {
+      // Get domain separator
+      const domainSeparator = getDomainSeparator(chainId, verifyingContract);
+
+      // Create EIP-712 digest
+      const digest = getEIP712Digest(domainSeparator, emailStructHash);
+
+      // Recover address from signature
+      const recoveredAddress = await recoverAddress(digest, headers.signature!);
+
+      // Compare with claimed address
+      const addressMatch = recoveredAddress.toLowerCase() === headers.address!.toLowerCase();
+
+      if (!addressMatch) {
+        return {
+          ok: false,
+          reason: `Address mismatch: recovered ${recoveredAddress}, claimed ${headers.address}`,
+        };
+      }
+
+      // Success
+      return {
+        ok: true,
+        address: recoveredAddress,
+        ens: headers.ens,
+        timestamp: headers.timestamp ? parseInt(headers.timestamp, 10) : undefined,
+      };
+    } else {
+      // Legacy verification (v1.0) - for backward compatibility
+      // Note: This is deprecated and should not be used for new signatures
       return {
         ok: false,
-        reason: `Address mismatch: recovered ${recoveredAddress}, claimed ${headers.address}`,
+        reason: "Legacy v1.0 signatures are no longer supported. Please use v2.0 with EIP-712.",
       };
     }
-
-    // Success
-    return {
-      ok: true,
-      address: recoveredAddress,
-      ens: headers.ens,
-      timestamp: headers.timestamp ? parseInt(headers.timestamp, 10) : undefined,
-    };
   } catch (error) {
     return {
       ok: false,
@@ -105,22 +148,47 @@ function isParsedHeaders(
 
 /**
  * Quick verification for minimal use case (just check signature validity)
- * 
+ *
  * @param headers - CMVH headers
- * @param body - Email body only (assumes from/to/subject extracted from headers)
+ * @param subject - Email subject
+ * @param from - Email from
+ * @param to - Email to
+ * @param chainId - Chain ID (required for EIP-712 v2.0)
+ * @param verifyingContract - Contract address (required for EIP-712 v2.0)
  * @returns True if signature is valid
  */
 export async function quickVerify(
   headers: ParsedCMVHHeaders,
-  canonicalString: string
+  subject: string,
+  from: string,
+  to: string,
+  chainId?: number,
+  verifyingContract?: Address
 ): Promise<boolean> {
   try {
     validateCMVHHeaders(headers);
-    
-    const hash = keccak256(canonicalString);
-    const recoveredAddress = await recoverAddress(hash, headers.signature!);
-    
-    return recoveredAddress.toLowerCase() === headers.address!.toLowerCase();
+
+    const version = headers.version || "1";
+
+    if (version === "2") {
+      if (!chainId || !verifyingContract) {
+        return false;
+      }
+
+      // Get timestamp from headers
+      const timestamp = headers.timestamp ? parseInt(headers.timestamp, 10) : 0;
+
+      // EIP-712 verification (includes timestamp for replay protection)
+      const emailStructHash = getEmailStructHash(subject, from, to, timestamp);
+      const domainSeparator = getDomainSeparator(chainId, verifyingContract);
+      const digest = getEIP712Digest(domainSeparator, emailStructHash);
+      const recoveredAddress = await recoverAddress(digest, headers.signature!);
+
+      return recoveredAddress.toLowerCase() === headers.address!.toLowerCase();
+    } else {
+      // Legacy v1.0 not supported
+      return false;
+    }
   } catch {
     return false;
   }

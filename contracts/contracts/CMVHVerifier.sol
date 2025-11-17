@@ -32,7 +32,17 @@ contract CMVHVerifier is Ownable {
     string public constant NAME = "CMVHVerifier";
 
     /// @notice Contract version
-    string public constant VERSION = "1.0.0";
+    string public constant VERSION = "2.0.0";
+
+    /// @notice EIP-712 Domain typehash
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    /// @notice EIP-712 Email struct typehash
+    bytes32 public constant EMAIL_TYPEHASH = keccak256(
+        "Email(string subject,string from,string to)"
+    );
 
     /// @notice Emitted when a signature is verified
     event SignatureVerified(
@@ -48,8 +58,22 @@ contract CMVHVerifier is Ownable {
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     /**
-     * @notice Verify ECDSA signature for email content
-     * @dev This is the core verification function matching SDK's verifyEmail
+     * @notice Get EIP-712 domain separator
+     * @return Domain separator for this contract and chain
+     */
+    function getDomainSeparator() public view returns (bytes32) {
+        return keccak256(abi.encode(
+            DOMAIN_TYPEHASH,
+            keccak256(bytes(NAME)),
+            keccak256(bytes(VERSION)),
+            block.chainid,
+            address(this)
+        ));
+    }
+
+    /**
+     * @notice Verify ECDSA signature for email content with EIP-712 domain separation
+     * @dev Recovers signer from EIP-712 structured data and emits verification event
      *
      * @param signer Expected signer's Ethereum address
      * @param emailHash keccak256 hash of canonicalized email
@@ -62,12 +86,24 @@ contract CMVHVerifier is Ownable {
         address signer,
         bytes32 emailHash,
         bytes memory signature
-    ) public pure returns (bool isValid) {
-        // Recover signer address from signature
-        address recovered = recoverSigner(emailHash, signature);
+    ) public returns (bool isValid) {
+        // Create EIP-712 digest with domain separation
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(),
+            emailHash
+        ));
 
-        // Compare recovered address with claimed signer (case-insensitive)
-        return recovered != address(0) && recovered == signer;
+        // Recover signer address from signature
+        address recovered = recoverSigner(digest, signature);
+
+        // Validate recovered address
+        isValid = recovered != address(0) && recovered == signer;
+
+        // Emit verification event for monitoring
+        emit SignatureVerified(signer, emailHash, isValid);
+
+        return isValid;
     }
 
     /**
@@ -89,9 +125,32 @@ contract CMVHVerifier is Ownable {
         string calldata from,
         string calldata to,
         bytes memory signature
-    ) public pure returns (bool isValid) {
+    ) public returns (bool isValid) {
         // Compute email hash using same canonicalization as SDK
-        return verifySignature(signer, hashEmail(subject, from, to), signature);
+        bytes32 emailHash = hashEmail(subject, from, to);
+        return verifySignature(signer, emailHash, signature);
+    }
+
+    /**
+     * @notice Get EIP-712 struct hash for email
+     * @dev Used by SDK to generate signatures
+     *
+     * @param subject Email subject
+     * @param from Email from address
+     * @param to Email to address
+     * @return structHash The EIP-712 struct hash
+     */
+    function getEmailStructHash(
+        string calldata subject,
+        string calldata from,
+        string calldata to
+    ) public pure returns (bytes32 structHash) {
+        return keccak256(abi.encode(
+            EMAIL_TYPEHASH,
+            keccak256(bytes(subject)),
+            keccak256(bytes(from)),
+            keccak256(bytes(to))
+        ));
     }
 
     /**
@@ -135,14 +194,16 @@ contract CMVHVerifier is Ownable {
 
     /**
      * @notice Hash email content using CMVH canonicalization
-     * @dev Matches SDK canonicalization: subject\nfrom\nto
-     *      Body excluded to avoid HTML formatting issues
+     * @dev Uses abi.encode to prevent collision attacks from embedded newlines
      *
      * Canonicalization Rules:
-     * 1. Concatenate fields with single newline separator
+     * 1. Use structured encoding (abi.encode) instead of packed
      * 2. Order: subject, from, to
      * 3. No trimming or normalization
      * 4. UTF-8 encoding assumed
+     *
+     * Security: abi.encode includes length prefixes, preventing collision attacks
+     * where different (subject, from, to) combinations could produce the same hash
      *
      * @param subject Email subject (can be empty)
      * @param from Email from address
@@ -156,7 +217,7 @@ contract CMVHVerifier is Ownable {
         string calldata from,
         string calldata to
     ) public pure returns (bytes32 hash) {
-        return keccak256(abi.encodePacked(subject, "\n", from, "\n", to));
+        return keccak256(abi.encode(subject, from, to));
     }
 
     /**
@@ -174,7 +235,7 @@ contract CMVHVerifier is Ownable {
         address[] calldata signers,
         bytes32[] calldata emailHashes,
         bytes[] calldata signatures
-    ) external pure returns (bool[] memory results) {
+    ) external returns (bool[] memory results) {
         uint256 length = signers.length;
         require(
             length == emailHashes.length && length == signatures.length,

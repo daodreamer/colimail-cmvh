@@ -9,7 +9,7 @@
 // Core functions
 export { signEmail } from "./sign.js";
 export { verifyCMVHHeaders, quickVerify } from "./verify.js";
-export { canonicalizeEmail, validateEmailContent } from "./canonicalize.js";
+export { validateEmailContent } from "./canonicalize.js";
 export { parseRawHeaders, validateCMVHHeaders, formatCMVHHeaders } from "./headers.js";
 
 // Crypto utilities

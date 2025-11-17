@@ -76,9 +76,9 @@ export function validateCMVHHeaders(headers: ParsedCMVHHeaders): void {
     }
   }
   
-  // Validate version
-  if (headers.version !== "1") {
-    throw new CMVHParseError(`Unsupported CMVH version: ${headers.version}`);
+  // Validate version (support v1 and v2)
+  if (headers.version !== "1" && headers.version !== "2") {
+    throw new CMVHParseError(`Unsupported CMVH version: ${headers.version}. Supported versions: 1, 2`);
   }
   
   // Validate hash algorithm

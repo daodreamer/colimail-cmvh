@@ -4,9 +4,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { signEmail, verifyCMVHHeaders, canonicalizeEmail } from "../src/index.js";
+import { signEmail, verifyCMVHHeaders } from "../src/index.js";
 import * as fs from "fs";
 import * as path from "path";
+
+const testChainId = 42161; // Arbitrum
+const testVerifyingContract = "0x5FbDB2315678afecb367f032d93F642f64180aa3" as const;
 
 interface BenchmarkResult {
   operation: string;
@@ -207,6 +210,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await signEmail({
             privateKey: testPrivateKey,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...smallEmail,
           });
         },
@@ -227,6 +232,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await signEmail({
             privateKey: testPrivateKey,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...mediumEmail,
           });
         },
@@ -247,6 +254,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await signEmail({
             privateKey: testPrivateKey,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...largeEmail,
           });
         },
@@ -265,6 +274,8 @@ describe("Performance Benchmarks", () => {
     it("should benchmark small email verification", async () => {
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...smallEmail,
       });
 
@@ -274,6 +285,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await verifyCMVHHeaders({
             headers,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...smallEmail,
           });
         },
@@ -290,6 +303,8 @@ describe("Performance Benchmarks", () => {
     it("should benchmark medium email verification", async () => {
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...mediumEmail,
       });
 
@@ -299,6 +314,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await verifyCMVHHeaders({
             headers,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...mediumEmail,
           });
         },
@@ -315,6 +332,8 @@ describe("Performance Benchmarks", () => {
     it("should benchmark large email verification", async () => {
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...largeEmail,
       });
 
@@ -324,6 +343,8 @@ describe("Performance Benchmarks", () => {
         async () => {
           await verifyCMVHHeaders({
             headers,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...largeEmail,
           });
         },
@@ -338,24 +359,6 @@ describe("Performance Benchmarks", () => {
     });
   });
 
-  describe("Canonicalization Performance", () => {
-    it("should benchmark canonicalization", async () => {
-      const result = await benchmark(
-        "Email Canonicalization",
-        1000,
-        () => {
-          canonicalizeEmail(mediumEmail);
-        },
-        {
-          bodyLength: mediumEmail.body.length,
-        }
-      );
-
-      console.log(`✓ Canonicalization: ${result.avgTime.toFixed(3)}ms avg`);
-      expect(result.avgTime).toBeLessThan(10); // Should be very fast
-    });
-  });
-
   describe("Bulk Operations", () => {
     it("should benchmark signing 100 emails", async () => {
       const result = await benchmark(
@@ -367,6 +370,8 @@ describe("Performance Benchmarks", () => {
             promises.push(
               signEmail({
                 privateKey: testPrivateKey,
+                chainId: testChainId,
+                verifyingContract: testVerifyingContract,
                 ...smallEmail,
                 subject: `Email ${i}`,
               })
@@ -392,6 +397,8 @@ describe("Performance Benchmarks", () => {
         Array.from({ length: 100 }, (_, i) =>
           signEmail({
             privateKey: testPrivateKey,
+            chainId: testChainId,
+            verifyingContract: testVerifyingContract,
             ...smallEmail,
             subject: `Email ${i}`,
           })
@@ -405,6 +412,8 @@ describe("Performance Benchmarks", () => {
           const promises = signedEmails.map((headers, i) =>
             verifyCMVHHeaders({
               headers,
+              chainId: testChainId,
+              verifyingContract: testVerifyingContract,
               ...smallEmail,
               subject: `Email ${i}`,
             })
@@ -433,6 +442,8 @@ describe("Performance Benchmarks", () => {
       for (let i = 0; i < 1000; i++) {
         const headers = await signEmail({
           privateKey: testPrivateKey,
+          chainId: testChainId,
+          verifyingContract: testVerifyingContract,
           ...smallEmail,
           subject: `Email ${i}`,
         });
@@ -445,6 +456,8 @@ describe("Performance Benchmarks", () => {
       for (let i = 0; i < 1000; i++) {
         await verifyCMVHHeaders({
           headers: signed[i],
+          chainId: testChainId,
+          verifyingContract: testVerifyingContract,
           ...smallEmail,
           subject: `Email ${i}`,
         });

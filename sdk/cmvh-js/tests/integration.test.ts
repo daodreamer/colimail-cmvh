@@ -9,8 +9,10 @@ import {
   verifyCMVHHeaders,
   parseRawHeaders,
   formatCMVHHeaders,
-  canonicalizeEmail,
 } from "../src/index.js";
+
+const testChainId = 42161; // Arbitrum
+const testVerifyingContract = "0x5FbDB2315678afecb367f032d93F642f64180aa3" as const;
 
 describe("Integration: Full Email Workflow", () => {
   const testPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
@@ -27,6 +29,8 @@ describe("Integration: Full Email Workflow", () => {
       // Step 1: Sign the email
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...originalEmail,
         ens: "alice.eth",
         reward: "0.1 wACT",
@@ -34,17 +38,19 @@ describe("Integration: Full Email Workflow", () => {
 
       // Step 2: Format headers as they would appear in real email
       const formattedHeaders = formatCMVHHeaders(headers);
-      expect(formattedHeaders).toContain("X-CMVH-Version: 1");
+      expect(formattedHeaders).toContain("X-CMVH-Version: 2");
       expect(formattedHeaders).toContain("X-CMVH-ENS: alice.eth");
 
       // Step 3: Simulate email transmission (parsing from raw headers)
       const parsedHeaders = parseRawHeaders(formattedHeaders);
-      expect(parsedHeaders.version).toBe("1");
+      expect(parsedHeaders.version).toBe("2");
       expect(parsedHeaders.ens).toBe("alice.eth");
 
       // Step 4: Verify the signature
       const result = await verifyCMVHHeaders({
         headers: parsedHeaders,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...originalEmail,
       });
 
@@ -64,6 +70,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...originalEmail,
       });
 
@@ -75,6 +83,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...tamperedEmail,
       });
 
@@ -89,6 +99,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const result2 = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...bodyChangedEmail,
       });
 
@@ -105,6 +117,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...originalEmail,
       });
 
@@ -112,6 +126,8 @@ describe("Integration: Full Email Workflow", () => {
       // In real implementation, forwarding should be detected separately
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...originalEmail, // Content unchanged
       });
 
@@ -131,11 +147,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...unicodeEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...unicodeEmail,
       });
 
@@ -152,11 +172,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...specialCharsEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...specialCharsEmail,
       });
 
@@ -173,11 +197,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...longEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...longEmail,
       });
 
@@ -194,11 +222,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...noSubjectEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...noSubjectEmail,
       });
 
@@ -216,11 +248,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...longSubjectEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...longSubjectEmail,
       });
 
@@ -240,11 +276,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...largeEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...largeEmail,
       });
 
@@ -263,11 +303,15 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...veryLargeEmail,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...veryLargeEmail,
       });
 
@@ -286,6 +330,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...whitespaceEmail,
       });
 
@@ -297,6 +343,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...trimmedSubject,
       });
 
@@ -310,6 +358,8 @@ describe("Integration: Full Email Workflow", () => {
 
       const result2 = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...changedBody,
       });
 
@@ -326,12 +376,16 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
       // Change one character in subject - should fail
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
         subject: "Test Subject!",  // Added exclamation mark
       });
@@ -353,19 +407,23 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers1 = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
         timestamp: 1000000,
       });
 
       const headers2 = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
         timestamp: 2000000, // Different timestamp
       });
 
       // Both signatures should be valid
-      const result1 = await verifyCMVHHeaders({ headers: headers1, ...email });
-      const result2 = await verifyCMVHHeaders({ headers: headers2, ...email });
+      const result1 = await verifyCMVHHeaders({ headers: headers1, chainId: testChainId, verifyingContract: testVerifyingContract, ...email });
+      const result2 = await verifyCMVHHeaders({ headers: headers2, chainId: testChainId, verifyingContract: testVerifyingContract, ...email });
 
       expect(result1.ok).toBe(true);
       expect(result2.ok).toBe(true);
@@ -374,9 +432,9 @@ describe("Integration: Full Email Workflow", () => {
       expect(headers1["X-CMVH-Timestamp"]).toBe("1000000");
       expect(headers2["X-CMVH-Timestamp"]).toBe("2000000");
 
-      // CRITICAL MVP LIMITATION: Signatures will be IDENTICAL because timestamp is not part of the signed content
-      // This is a known security limitation documented in MVP_SPEC.md
-      expect(headers1["X-CMVH-Signature"]).toBe(headers2["X-CMVH-Signature"]);
+      // With EIP-712: Signatures will be DIFFERENT because timestamp is now part of the signed message
+      // This provides replay protection
+      expect(headers1["X-CMVH-Signature"]).not.toBe(headers2["X-CMVH-Signature"]);
     });
 
     it("should accept future timestamps (known MVP limitation)", async () => {
@@ -390,12 +448,16 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
         timestamp: futureTimestamp,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
@@ -414,12 +476,16 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
         timestamp: oldTimestamp,
       });
 
       const result = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
@@ -438,12 +504,16 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
       // Try swapping from/to addresses
       const swappedResult = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         from: email.to,
         to: email.from,
         subject: email.subject,
@@ -456,6 +526,8 @@ describe("Integration: Full Email Workflow", () => {
       // But we can test swapping subject with from/to
       const subjectSwappedResult = await verifyCMVHHeaders({
         headers,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         from: email.subject,  // This is invalid but tests the strict ordering
         to: email.to,
         subject: email.from,
@@ -465,25 +537,6 @@ describe("Integration: Full Email Workflow", () => {
       expect(subjectSwappedResult.ok).toBe(false);
     });
 
-    it("should verify canonicalization order is strictly enforced (no body)", () => {
-      const email = {
-        from: "alice@example.com",
-        to: "bob@example.com",
-        subject: "Test",
-        body: "Content",
-      };
-
-      const canonical = canonicalizeEmail(email);
-
-      // CMVH v1.0 order: subject, from, to (body excluded)
-      const expected = `${email.subject}\n${email.from}\n${email.to}`;
-      expect(canonical).toBe(expected);
-      expect(canonical).not.toContain(email.body);  // Body should NOT be in canonical form
-
-      // Wrong order should produce different hash
-      const wrongOrder = `${email.from}\n${email.to}\n${email.subject}`;
-      expect(canonical).not.toBe(wrongOrder);
-    });
   });
 
   describe("Header Format Compatibility", () => {
@@ -497,12 +550,14 @@ describe("Integration: Full Email Workflow", () => {
 
       const headers = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
       // Format with extra spaces
       const rawWithSpaces = `
-X-CMVH-Version:    1
+X-CMVH-Version:    2
 X-CMVH-Address:   ${headers["X-CMVH-Address"]}
 X-CMVH-Chain:  ${headers["X-CMVH-Chain"]}
 X-CMVH-Timestamp:${headers["X-CMVH-Timestamp"]}
@@ -513,6 +568,8 @@ X-CMVH-Signature: ${headers["X-CMVH-Signature"]}
       const parsed = parseRawHeaders(rawWithSpaces);
       const result = await verifyCMVHHeaders({
         headers: parsed,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
@@ -529,6 +586,8 @@ X-CMVH-Signature: ${headers["X-CMVH-Signature"]}
 
       const cmvhHeaders = await signEmail({
         privateKey: testPrivateKey,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 
@@ -553,6 +612,8 @@ X-Mailer: ColiMail 1.0
       const parsed = parseRawHeaders(fullEmailHeaders);
       const result = await verifyCMVHHeaders({
         headers: parsed,
+        chainId: testChainId,
+        verifyingContract: testVerifyingContract,
         ...email,
       });
 

@@ -1,18 +1,25 @@
 /**
- * CMVH Email Signing
+ * CMVH Email Signing (EIP-712 v2.0)
  */
 
-import type { SignEmailInput, CMVHHeaders } from "./types.js";
-import { canonicalizeEmail, validateEmailContent } from "./canonicalize.js";
-import { keccak256, signHash, isValidHex } from "./crypto.js";
+import type { SignEmailInput, CMVHHeaders, Address } from "./types.js";
+import { validateEmailContent } from "./canonicalize.js";
+import {
+  keccak256,
+  signHash,
+  isValidHex,
+  getDomainSeparator,
+  getEmailStructHash,
+  getEIP712Digest
+} from "./crypto.js";
 import { CMVHValidationError } from "./errors.js";
 
 /**
- * Sign an email and generate CMVH headers
- * 
+ * Sign an email and generate CMVH headers with EIP-712
+ *
  * @param input - Email content and signing parameters
  * @returns CMVH headers ready to inject into email
- * 
+ *
  * @example
  * ```ts
  * const headers = await signEmail({
@@ -20,11 +27,13 @@ import { CMVHValidationError } from "./errors.js";
  *   from: "alice@gmail.com",
  *   to: "bob@outlook.com",
  *   subject: "Partnership Proposal",
- *   body: "Hello Bob, let's collaborate..."
+ *   body: "Hello Bob, let's collaborate...",
+ *   chainId: 42161, // Arbitrum
+ *   verifyingContract: "0x..."
  * });
- * 
+ *
  * // headers = {
- * //   "X-CMVH-Version": "1",
+ * //   "X-CMVH-Version": "2",
  * //   "X-CMVH-Address": "0x...",
  * //   ...
  * // }
@@ -33,7 +42,7 @@ import { CMVHValidationError } from "./errors.js";
 export async function signEmail(input: SignEmailInput): Promise<CMVHHeaders> {
   // Validate input
   validateSignInput(input);
-  
+
   const {
     privateKey,
     from,
@@ -42,6 +51,8 @@ export async function signEmail(input: SignEmailInput): Promise<CMVHHeaders> {
     body,
     timestamp = Math.floor(Date.now() / 1000),
     chain = "Arbitrum",
+    chainId = 42161, // Default to Arbitrum
+    verifyingContract,
     ens,
     reward,
     proofURL,
@@ -50,21 +61,29 @@ export async function signEmail(input: SignEmailInput): Promise<CMVHHeaders> {
   // Validate email content
   validateEmailContent({ from, to, subject, body });
 
-  // Canonicalize email
-  const canonical = canonicalizeEmail({ from, to, subject, body });
-
-  // Hash canonical string
-  const hash = keccak256(canonical);
-
-  // Sign hash
-  const signature = await signHash(hash, privateKey);
-
-  // Derive address from private key for verification
+  // Derive address from private key
   const address = await deriveAddress(privateKey);
 
-  // Build headers
+  // Validate verifying contract if provided
+  if (!verifyingContract) {
+    throw new CMVHValidationError("Missing verifyingContract parameter (required for EIP-712)");
+  }
+
+  // Get EIP-712 struct hash for email (includes timestamp for replay protection)
+  const emailStructHash = getEmailStructHash(subject, from, to, timestamp);
+
+  // Get domain separator
+  const domainSeparator = getDomainSeparator(chainId, verifyingContract as Address);
+
+  // Create EIP-712 digest
+  const digest = getEIP712Digest(domainSeparator, emailStructHash);
+
+  // Sign the EIP-712 digest
+  const signature = await signHash(digest, privateKey);
+
+  // Build headers (v2.0)
   const headers: CMVHHeaders = {
-    "X-CMVH-Version": "1",
+    "X-CMVH-Version": "2",
     "X-CMVH-Address": address,
     "X-CMVH-Chain": chain,
     "X-CMVH-Timestamp": timestamp.toString(),
